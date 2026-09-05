@@ -189,7 +189,19 @@ export default function StudentThesisUpload() {
                   <tr key={d.id} className="border-t border-border hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center justify-center text-xs font-bold text-red-600">PDF</div>
+                        <div
+  className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold ${
+    d.fileType?.toLowerCase() === "pdf"
+      ? "bg-red-50 dark:bg-red-900/20 text-red-600"
+      : "bg-blue-50 dark:bg-blue-900/20 text-blue-600"
+  }`}
+>
+  {d.fileType?.toLowerCase() === "pdf"
+    ? "PDF"
+    : d.fileType?.toLowerCase() === "docx"
+      ? "DOCX"
+      : d.fileType?.toUpperCase() || "FILE"}
+</div>
                         <span className="text-xs font-semibold text-foreground">{d.fileName}</span>
                       </div>
                     </td>

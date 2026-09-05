@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Users, ListChecks, Flag, FileText } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Users,
+  ListChecks,
+  Flag,
+  FileText,
+  Download,
+  Eye,
+} from "lucide-react";
 import { studentService } from "../../services/StudentService";
 import { Project, TaskItem, Milestone, ProjectDocument } from "../../types/Student";
 import Card from "../../components/common/Card";
@@ -54,6 +63,34 @@ export default function StudentMyResearch() {
       setForm({ title: "", description: "", targetEndDate: "" });
     } catch { }
   };
+
+//   const handlePreview = async (docId: string, fileType: string) => {
+//   try {
+//     if (fileType.toLowerCase().includes("pdf")) {
+//       const blob = await studentService.previewDocument(projectId, docId);
+
+//       const url = window.URL.createObjectURL(blob);
+//       window.open(url, "_blank");
+
+//       setTimeout(() => {
+//         window.URL.revokeObjectURL(url);
+//       }, 60000);
+//     } else {
+//       alert("Preview is currently available only for PDF documents.");
+//     }
+//   } catch (error) {
+//     console.error("Preview failed:", error);
+//     alert("Unable to preview this document.");
+//   }
+// };
+
+{/* <button
+  onClick={() => handlePreview(d.id, d.fileType)}
+  className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg"
+  title="Preview"
+>
+  <Eye className="w-4 h-4" />
+</button> */}
 
   const handleDeleteProject = async (id: string) => {
     try {
@@ -307,73 +344,265 @@ function MilestoneTab({ projectId, milestones }: { projectId: string; milestones
   );
 }
 
-function DocumentTab({ projectId, documents }: { projectId: string; documents: ProjectDocument[] }) {
+function DocumentTab({
+  projectId,
+  documents,
+}: {
+  projectId: string;
+  documents: ProjectDocument[];
+}) {
   const [items, setItems] = useState(documents);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ fileName: "", fileType: "", fileSize: 0 });
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  useEffect(() => { setItems(documents); }, [documents]);
+  useEffect(() => {
+    setItems(documents);
+  }, [documents]);
 
-  const handleCreate = async () => {
+  // Preview document
+  const handlePreview = async (doc: ProjectDocument) => {
     try {
-      const d = await studentService.createDocument(projectId, form);
-      setItems([d, ...items]);
-      setShowForm(false);
-      setForm({ fileName: "", fileType: "", fileSize: 0 });
-    } catch { }
+      setLoadingId(doc.id);
+
+      // PDF can be previewed directly in browser
+
+      // if (doc.fileType?.toLowerCase() === "pdf") {
+      if (doc.fileType?.toLowerCase().includes("pdf")) {
+        // const blob = await studentService.previewDocument(projectId, doc.id);
+        // const url = window.URL.createObjectURL(blob);
+
+        const result = await studentService.previewDocument(projectId, doc.id);
+const url = window.URL.createObjectURL(result.data);
+
+        window.open(url, "_blank");
+
+        // Give the new tab time to load before revoking
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 60000);
+      } else {
+        // DOC/DOCX cannot reliably preview directly in browser.
+        // For those, download instead.
+        await handleDownload(doc);
+      }
+    } catch (error) {
+      console.error("Preview failed:", error);
+      alert("Unable to preview this document.");
+    } finally {
+      setLoadingId(null);
+    }
   };
 
+  // Download document
+  const handleDownload = async (doc: ProjectDocument) => {
+  try {
+    setLoadingId(doc.id);
+
+    const result = await studentService.downloadDocument(projectId, doc.id);
+
+    const url = window.URL.createObjectURL(result.data);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = result.fileName || doc.fileName;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download failed:", error);
+    alert("Unable to download this document.");
+  } finally {
+    setLoadingId(null);
+  }
+};
+
+  // Delete document
   const handleDelete = async (docId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this document?"
+    );
+
+    if (!confirmed) return;
+
     try {
+      setLoadingId(docId);
+
       await studentService.deleteDocument(projectId, docId);
-      setItems(items.filter((d) => d.id !== docId));
-    } catch { }
+
+      setItems((prev) => prev.filter((d) => d.id !== docId));
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Unable to delete this document.");
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <SectionHead title="Documents" />
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-1 text-xs font-bold text-blue-600">
-          <Plus className="w-3 h-3" /> Add Document
-        </button>
+
+        <span className="text-xs text-muted-foreground">
+          {items.length} document{items.length !== 1 ? "s" : ""}
+        </span>
       </div>
-      {showForm && (
-        <div className="flex flex-col gap-2 mb-4 p-3 bg-muted rounded-xl">
-          <input value={form.fileName} onChange={(e) => setForm({ ...form, fileName: e.target.value })}
-            className="w-full bg-input-background border border-border rounded-xl px-3 py-2 text-sm outline-none" placeholder="File name" />
-          <input value={form.fileType} onChange={(e) => setForm({ ...form, fileType: e.target.value })}
-            className="w-full bg-input-background border border-border rounded-xl px-3 py-2 text-sm outline-none" placeholder="File type (e.g., pdf, docx)" />
-          <input type="number" value={form.fileSize || ""} onChange={(e) => setForm({ ...form, fileSize: parseInt(e.target.value) || 0 })}
-            className="w-full bg-input-background border border-border rounded-xl px-3 py-2 text-sm outline-none" placeholder="File size (bytes)" />
-          <div className="flex gap-2">
-            <button onClick={handleCreate} className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl">Add</button>
-            <button onClick={() => setShowForm(false)} className="text-muted-foreground text-xs px-3 py-1.5">Cancel</button>
-          </div>
-        </div>
-      )}
+
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No documents yet</p>
+        <div className="py-8 text-center">
+          <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+
+          <p className="text-sm text-muted-foreground">
+            No documents uploaded yet
+          </p>
+
+          <p className="text-xs text-muted-foreground mt-1">
+            Upload your research documents from the Thesis Upload page.
+          </p>
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {items.map((d) => (
-            <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{d.fileName}</p>
-                <p className="text-xs text-muted-foreground">{d.fileType} · {(d.fileSize / 1024).toFixed(1)} KB · {d.uploaderName}</p>
+          {items.map((d) => {
+            const fileType = d.fileType?.toLowerCase() || "";
+
+            return (
+              <div
+                key={d.id}
+                className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/60 transition-colors"
+              >
+                {/* File icon */}
+                <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center border border-border flex-shrink-0">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                </div>
+
+                {/* File information */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {d.fileName}
+                  </p>
+
+                  <p className="text-xs text-muted-foreground">
+                    {fileType.toUpperCase()} ·{" "}
+                    {(d.fileSize / 1024).toFixed(1)} KB · {d.uploaderName}
+                  </p>
+                </div>
+
+                {/* Upload date */}
+                <span className="text-xs text-muted-foreground hidden sm:block">
+                  {new Date(d.uploadedAt).toLocaleDateString()}
+                </span>
+
+                {/* Preview */}
+                <button
+                  onClick={() => handlePreview(d)}
+                  disabled={loadingId === d.id}
+                  title={
+                    fileType === "pdf"
+                      ? "Preview"
+                      : "DOC/DOCX preview is not supported in browser"
+                  }
+                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+
+                {/* Download */}
+                <button
+                  onClick={() => handleDownload(d)}
+                  disabled={loadingId === d.id}
+                  title="Download"
+                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+
+                {/* Delete */}
+                <button
+                  onClick={() => handleDelete(d.id)}
+                  disabled={loadingId === d.id}
+                  title="Delete"
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <span className="text-xs text-muted-foreground">{new Date(d.uploadedAt).toLocaleDateString()}</span>
-              <button onClick={() => handleDelete(d.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg">
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Card>
   );
 }
+
+// function DocumentTab({ projectId, documents }: { projectId: string; documents: ProjectDocument[] }) {
+//   const [items, setItems] = useState(documents);
+//   const [showForm, setShowForm] = useState(false);
+//   const [form, setForm] = useState({ fileName: "", fileType: "", fileSize: 0 });
+
+//   useEffect(() => { setItems(documents); }, [documents]);
+
+//   const handleCreate = async () => {
+//     try {
+//       const d = await studentService.createDocument(projectId, form);
+//       setItems([d, ...items]);
+//       setShowForm(false);
+//       setForm({ fileName: "", fileType: "", fileSize: 0 });
+//     } catch { }
+//   };
+
+//   const handleDelete = async (docId: string) => {
+//     try {
+//       await studentService.deleteDocument(projectId, docId);
+//       setItems(items.filter((d) => d.id !== docId));
+//     } catch { }
+//   };
+
+//   return (
+//     <Card>
+//       <div className="flex items-center justify-between mb-3">
+//         <SectionHead title="Documents" />
+//         <button onClick={() => setShowForm(true)} className="flex items-center gap-1 text-xs font-bold text-blue-600">
+//           <Plus className="w-3 h-3" /> Add Document
+//         </button>
+//       </div>
+//       {showForm && (
+//         <div className="flex flex-col gap-2 mb-4 p-3 bg-muted rounded-xl">
+//           <input value={form.fileName} onChange={(e) => setForm({ ...form, fileName: e.target.value })}
+//             className="w-full bg-input-background border border-border rounded-xl px-3 py-2 text-sm outline-none" placeholder="File name" />
+//           <input value={form.fileType} onChange={(e) => setForm({ ...form, fileType: e.target.value })}
+//             className="w-full bg-input-background border border-border rounded-xl px-3 py-2 text-sm outline-none" placeholder="File type (e.g., pdf, docx)" />
+//           <input type="number" value={form.fileSize || ""} onChange={(e) => setForm({ ...form, fileSize: parseInt(e.target.value) || 0 })}
+//             className="w-full bg-input-background border border-border rounded-xl px-3 py-2 text-sm outline-none" placeholder="File size (bytes)" />
+//           <div className="flex gap-2">
+//             <button onClick={handleCreate} className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl">Add</button>
+//             <button onClick={() => setShowForm(false)} className="text-muted-foreground text-xs px-3 py-1.5">Cancel</button>
+//           </div>
+//         </div>
+//       )}
+//       {items.length === 0 ? (
+//         <p className="text-sm text-muted-foreground">No documents yet</p>
+//       ) : (
+//         <div className="flex flex-col gap-2">
+//           {items.map((d) => (
+//             <div key={d.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
+//               <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+//               <div className="flex-1 min-w-0">
+//                 <p className="text-xs font-medium text-foreground truncate">{d.fileName}</p>
+//                 <p className="text-xs text-muted-foreground">{d.fileType} · {(d.fileSize / 1024).toFixed(1)} KB · {d.uploaderName}</p>
+//               </div>
+//               <span className="text-xs text-muted-foreground">{new Date(d.uploadedAt).toLocaleDateString()}</span>
+//               <button onClick={() => handleDelete(d.id)} className="p-1 text-red-500 hover:bg-red-50 rounded-lg">
+//                 <Trash2 className="w-3 h-3" />
+//               </button>
+//             </div>
+//           ))}
+//         </div>
+//       )}
+//     </Card>
+//   );
+// }
 
 function MemberTab({ project }: { project: Project }) {
   return (
