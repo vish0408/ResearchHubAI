@@ -34,9 +34,10 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Enter your JWT token"
     });
 
-    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
+options.AddSecurityRequirement(document =>
+    new OpenApiSecurityRequirement
     {
-        { new OpenApiSecuritySchemeReference("Bearer"), new List<string>() }
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
     });
 });
 
@@ -115,11 +116,11 @@ if (app.Environment.IsDevelopment())
     if (missing.Count > 0)
     {
         var msg = $"SMTP configuration is incomplete. Missing or placeholder values for: {string.Join(", ", missing)}. Set them via:\n" +
-                  $"  dotnet user-secrets set \"Smtp:Host\" \"your-smtp-host.com\"\n" +
-                  $"  dotnet user-secrets set \"Smtp:Port\" \"587\"\n" +
-                  $"  dotnet user-secrets set \"Smtp:Username\" \"your-email@gmail.com\"\n" +
-                  $"  dotnet user-secrets set \"Smtp:Password\" \"your-app-password\"\n" +
-                  $"  dotnet user-secrets set \"Smtp:FromEmail\" \"your-email@gmail.com\"";
+          $"  dotnet user-secrets set \"Smtp:Host\" \"smtp.gmail.com\"\n" +
+          $"  dotnet user-secrets set \"Smtp:Port\" \"587\"\n" +
+          $"  dotnet user-secrets set \"Smtp:Username\" \"sowmiyatgs@gmail.com\"\n" +
+          $"  dotnet user-secrets set \"Smtp:Password\" \"CTO@2026\"\n" +
+          $"  dotnet user-secrets set \"Smtp:FromEmail\" \"sowmiyatgs@gmail.com\"";
         logger.LogError("SMTP validation failed: {Message}", msg);
         throw new InvalidOperationException(msg);
     }

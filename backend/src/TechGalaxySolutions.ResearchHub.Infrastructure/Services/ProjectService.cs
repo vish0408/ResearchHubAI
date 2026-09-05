@@ -193,6 +193,7 @@ public class ProjectService : IProjectService
     public async Task<double> RecalculateCompletionPercentageAsync(Guid projectId)
     {
         var project = await _context.Projects
+            .Include(p => p.Tasks)
             .Include(p => p.Milestones)
             .Include(p => p.Documents)
             .Include(p => p.Reviews)
@@ -201,19 +202,42 @@ public class ProjectService : IProjectService
 
         double score = 0;
 
-        var milestones = project.Milestones.Where(m => !m.IsDeleted).ToList();
-        if (milestones.Count > 0)
-        {
-            var completedCount = milestones.Count(m => m.IsCompleted);
-            score += (double)completedCount / milestones.Count * 50;
-        }
+        // var milestones = project.Milestones.Where(m => !m.IsDeleted).ToList();
+        // if (milestones.Count > 0)
+        // {
+        //     var completedCount = milestones.Count(m => m.IsCompleted);
+        //     score += (double)completedCount / milestones.Count * 50;
+        // }
+
+        var milestones = project.Milestones
+    .Where(m => !m.IsDeleted)
+    .ToList();
+
+if (milestones.Count > 0)
+{
+    var completedCount = milestones.Count(m => m.IsCompleted);
+    score += (double)completedCount / milestones.Count * 40;
+}
+
+var tasks = project.Tasks
+    .Where(t => !t.IsDeleted)
+    .ToList();
+
+if (tasks.Count > 0)
+{
+    var completedCount = tasks.Count(t => t.Status == TaskItemStatus.Completed);
+    score += (double)completedCount / tasks.Count * 20;
+}
 
         var docs = project.Documents.Where(d => !d.IsDeleted).ToList();
         if (docs.Count > 0)
         {
-            var unit = 25.0 / Math.Max(docs.Count, 1);
+            // var unit = 25.0 / Math.Max(docs.Count, 1);
+
+            var unit = 20.0 / Math.Max(docs.Count, 1);
             var docScore = docs.Sum(d => d.DocumentStatus == "Migrated" || !string.IsNullOrEmpty(d.StoredFilePath) ? unit : 0);
-            score += Math.Min(docScore, 25);
+            // score += Math.Min(docScore, 25);
+            score += Math.Min(docScore, 20);
         }
 
         var reviews = project.Reviews.Where(r => !r.IsDeleted).ToList();
@@ -225,7 +249,8 @@ public class ProjectService : IProjectService
         {
             var approved = reviews.Count(r => r.Status == ReviewStatus.Approved)
                          + docReviews.Count(r => r.Status == "Approved");
-            score += (double)approved / allReviews.Count * 25;
+            // score += (double)approved / allReviews.Count * 25;
+            score += (double)approved / allReviews.Count * 20;
         }
 
         project.CompletionPercentage = Math.Round(Math.Min(score, 100), 1);

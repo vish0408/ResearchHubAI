@@ -1,6 +1,10 @@
 import { apiClient } from "../api/client";
 import { StudentProfileDto, Project, TaskItem, Milestone, ProjectDocument, AppNotification, DashboardData } from "../types/Student";
-import type { Chapter, Meeting } from "../types/Guide";
+import type {
+  Chapter,
+  ChapterVersion,
+  Meeting,
+} from "../types/Guide";
 import type { PagedResponse } from "../types/Pagination";
 
 export class StudentService {
@@ -112,12 +116,47 @@ export class StudentService {
     if (!res.success) throw new Error(res.message || "Failed to delete milestone");
   }
 
-  // Documents
-  async getDocuments(projectId: string): Promise<ProjectDocument[]> {
-    const res = await apiClient.get<ProjectDocument[]>(`/projects/${projectId}/documents`);
-    if (!res.success || !res.data) throw new Error(res.message || "Failed to get documents");
-    return res.data;
+  // Documents 
+async getDocuments(projectId: string): Promise<ProjectDocument[]> { 
+  const res = await apiClient.get<ProjectDocument[]>(`/projects/${projectId}/documents`); 
+  if (!res.success || !res.data) throw new Error(res.message || "Failed to get documents"); 
+  return res.data; 
+}
+
+async getChapterVersions(projectId: string, chapterId: string) {
+  const res = await apiClient.get(
+    `/projects/${projectId}/chapters/${chapterId}/versions`
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to get chapter versions");
   }
+
+  return res.data;
+}
+
+
+async createChapterVersion(
+  projectId: string,
+  chapterId: string,
+  data: { content: string }
+) {
+  const res = await apiClient.post(
+    `/projects/${projectId}/chapters/${chapterId}/versions`,
+    data
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to create chapter version"
+    );
+  }
+
+  return res.data;
+}
+
+
+
 
   async createDocument(projectId: string, data: Partial<ProjectDocument>): Promise<ProjectDocument> {
     const res = await apiClient.post<ProjectDocument>(`/projects/${projectId}/documents`, data);
@@ -152,6 +191,47 @@ export class StudentService {
     if (!res.success || !res.data) throw new Error(res.message || "Failed to get chapters");
     return res.data;
   }
+
+ 
+
+  async createChapter(
+  projectId: string,
+  data: {
+    title: string;
+    content: string;
+    order: number;
+  }
+): Promise<Chapter> {
+  const res = await apiClient.post<Chapter>(
+    `/projects/${projectId}/chapters`,
+    data
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to create chapter");
+  }
+
+  return res.data;
+}
+
+//  async createChapterVersion(
+//   projectId: string,
+//   chapterId: string,
+//   data: { content: string }
+// ): Promise<ChapterVersion> {
+//   const res = await apiClient.post<ChapterVersion>(
+//     `/projects/${projectId}/chapters/${chapterId}/versions`,
+//     data
+//   );
+
+//   if (!res.success || !res.data) {
+//     throw new Error(
+//       res.message || "Failed to create chapter version"
+//     );
+//   }
+
+//   return res.data;
+// }
 
   async addChapterComment(chapterId: string, data: { content: string; lineNumber?: number }): Promise<void> {
     const res = await apiClient.post(`/chapters/${chapterId}/comments`, data);

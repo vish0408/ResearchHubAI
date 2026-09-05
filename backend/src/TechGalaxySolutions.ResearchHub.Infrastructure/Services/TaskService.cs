@@ -10,14 +10,28 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Services;
 
 public class TaskService : ITaskService
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IMapper _mapper;
+    // private readonly ApplicationDbContext _context;
+    // private readonly IMapper _mapper;
 
-    public TaskService(ApplicationDbContext context, IMapper mapper)
-    {
-        _context = context;
-        _mapper = mapper;
-    }
+    private readonly ApplicationDbContext _context;
+private readonly IMapper _mapper;
+private readonly IProjectService _projectService;
+
+    // public TaskService(ApplicationDbContext context, IMapper mapper)
+    // {
+    //     _context = context;
+    //     _mapper = mapper;
+    // }
+
+    public TaskService(
+    ApplicationDbContext context,
+    IMapper mapper,
+    IProjectService projectService)
+{
+    _context = context;
+    _mapper = mapper;
+    _projectService = projectService;
+}
 
     public async Task<List<TaskItemResponse>> GetProjectTasksAsync(Guid projectId, Guid userId)
     {
@@ -59,10 +73,18 @@ public class TaskService : ITaskService
             AssignedToId = request.AssignedToId,
         };
 
-        _context.TaskItems.Add(task);
-        await _context.SaveChangesAsync();
+        // _context.TaskItems.Add(task);
+        // await _context.SaveChangesAsync();
 
-        return await GetByIdAsync(task.Id, userId);
+        // return await GetByIdAsync(task.Id, userId);
+
+        _context.TaskItems.Add(task);
+await _context.SaveChangesAsync();
+
+await _projectService.RecalculateCompletionPercentageAsync(projectId);
+
+return await GetByIdAsync(task.Id, userId);
+
     }
 
     public async Task<TaskItemResponse> UpdateAsync(Guid taskId, Guid userId, UpdateTaskItemRequest request)
@@ -81,9 +103,16 @@ public class TaskService : ITaskService
         task.DueDate = request.DueDate;
         task.AssignedToId = request.AssignedToId;
 
+        // await _context.SaveChangesAsync();
+
+        // return _mapper.Map<TaskItemResponse>(task);
+
         await _context.SaveChangesAsync();
 
-        return _mapper.Map<TaskItemResponse>(task);
+await _projectService.RecalculateCompletionPercentageAsync(task.ProjectId);
+
+return _mapper.Map<TaskItemResponse>(task);
+
     }
 
     public async Task DeleteAsync(Guid taskId, Guid userId)
@@ -94,8 +123,14 @@ public class TaskService : ITaskService
 
         await VerifyProjectAccess(task.ProjectId, userId);
 
+        // task.IsDeleted = true;
+        // await _context.SaveChangesAsync();
+
         task.IsDeleted = true;
-        await _context.SaveChangesAsync();
+await _context.SaveChangesAsync();
+
+await _projectService.RecalculateCompletionPercentageAsync(task.ProjectId);
+
     }
 
     private async Task VerifyProjectAccess(Guid projectId, Guid userId)

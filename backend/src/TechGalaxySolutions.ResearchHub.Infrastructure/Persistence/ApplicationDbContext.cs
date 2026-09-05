@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<GuideProfile> GuideProfiles => Set<GuideProfile>();
     public DbSet<Domain.Entities.Review> Reviews => Set<Domain.Entities.Review>();
     public DbSet<Chapter> Chapters => Set<Chapter>();
+    public DbSet<ChapterVersion> ChapterVersions { get; set; }
     public DbSet<ChapterComment> ChapterComments => Set<ChapterComment>();
     public DbSet<Meeting> Meetings => Set<Meeting>();
     public DbSet<MeetingParticipant> MeetingParticipants => Set<MeetingParticipant>();
@@ -62,6 +63,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Hod> Hods => Set<Hod>();
     public DbSet<ResearchStage> ResearchStages => Set<ResearchStage>();
     public DbSet<ScholarCoursework> ScholarCoursework => Set<ScholarCoursework>();
+    
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -170,6 +172,22 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(c => c.Project).WithMany(p => p.Chapters).HasForeignKey(c => c.ProjectId);
             entity.HasIndex(c => c.ProjectId).HasDatabaseName("IX_Chapters_ProjectId");
         });
+
+        modelBuilder.Entity<ChapterVersion>(entity =>
+{
+    entity.HasOne(cv => cv.Chapter)
+        .WithMany(c => c.Versions)
+        .HasForeignKey(cv => cv.ChapterId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    entity.HasIndex(cv => cv.ChapterId)
+        .HasDatabaseName("IX_ChapterVersions_ChapterId");
+
+    entity.HasIndex(cv => new { cv.ChapterId, cv.VersionNumber })
+        .IsUnique()
+        .HasFilter("[IsDeleted] = 0")
+        .HasDatabaseName("IX_ChapterVersions_ChapterId_VersionNumber");
+});
 
         modelBuilder.Entity<ChapterComment>(entity =>
         {

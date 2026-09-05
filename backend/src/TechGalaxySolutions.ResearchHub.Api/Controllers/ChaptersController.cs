@@ -24,6 +24,21 @@ public class ChaptersController : ControllerBase
         return Ok(chapters);
     }
 
+    [HttpPost]
+    public async Task<IActionResult> Create(
+        Guid projectId,
+        [FromBody] CreateChapterRequest request)
+    {
+        var userId = User.GetUserId();
+
+        var chapter = await _chapterService.CreateAsync(
+            projectId,
+            userId,
+            request);
+
+        return Ok(chapter);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid projectId, Guid id)
     {
@@ -31,11 +46,43 @@ public class ChaptersController : ControllerBase
         return Ok(chapter);
     }
 
+    // GET: /projects/{projectId}/chapters/{id}/versions
+    [HttpGet("{id:guid}/versions")]
+    public async Task<IActionResult> GetVersions(Guid projectId, Guid id)
+    {
+        var versions = await _chapterService.GetVersionsAsync(id);
+        return Ok(versions);
+    }
+
+    [HttpPost("{id:guid}/versions")]
+public async Task<IActionResult> CreateVersion(
+    Guid projectId,
+    Guid id,
+    [FromBody] CreateChapterVersionRequest request)
+{
+    var userId = User.GetUserId();
+
+    var version = await _chapterService.CreateVersionAsync(
+        id,
+        userId,
+        request);
+
+    return Ok(version);
+}
+
     [HttpPut("{id:guid}/status")]
-    public async Task<IActionResult> UpdateStatus(Guid projectId, Guid id, [FromBody] UpdateChapterStatusRequest request)
+    public async Task<IActionResult> UpdateStatus(
+        Guid projectId,
+        Guid id,
+        [FromBody] UpdateChapterStatusRequest request)
     {
         var userId = User.GetUserId();
-        var chapter = await _chapterService.UpdateStatusAsync(id, userId, request);
+
+        var chapter = await _chapterService.UpdateStatusAsync(
+            id,
+            userId,
+            request);
+
         return Ok(chapter);
     }
 }
