@@ -11,4 +11,5 @@ public class Chapter : BaseEntity
     public int Order { get; set; }
     public ChapterStatus Status { get; set; } = ChapterStatus.Draft;
     public ICollection<ChapterComment> Comments { get; set; } = new List<ChapterComment>();
+    public ICollection<ChapterVersion> Versions { get; set; } = new List<ChapterVersion>();
 }

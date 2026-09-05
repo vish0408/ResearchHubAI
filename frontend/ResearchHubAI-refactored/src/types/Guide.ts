@@ -167,3 +167,12 @@ export interface ApprovalHistoryEntry {
   previousStatus: string;
   createdAt: string;
 }
+
+export type ChapterVersion = {
+  id: string;
+  chapterId: string;
+  versionNumber: number;
+  content: string;
+  status: string;
+  createdAt: string;
+};
