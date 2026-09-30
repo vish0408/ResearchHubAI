@@ -110,8 +110,12 @@ export default function LiteratureReviewPage() {
       const hist = await literatureService.getHistory();
       setReviews(hist);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Analysis failed");
-    } finally {
+  if (e instanceof DOMException && e.name === "AbortError") {
+    setError("AI analysis timed out. Please try again.");
+  } else {
+    setError(e instanceof Error ? e.message : "Analysis failed");
+  }
+} finally {
       setAnalyzing(null);
     }
   };

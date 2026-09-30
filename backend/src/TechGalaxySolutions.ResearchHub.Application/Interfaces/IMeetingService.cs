@@ -10,4 +10,5 @@ public interface IMeetingService
     Task<MeetingResponse> CreateAsync(Guid guideId, CreateMeetingRequest request);
     Task<MeetingResponse> UpdateAsync(Guid meetingId, Guid userId, UpdateMeetingRequest request);
     Task DeleteAsync(Guid meetingId, Guid userId);
+    Task<MeetingResponse> CancelAsync(Guid meetingId, Guid userId);
 }

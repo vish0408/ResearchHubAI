@@ -13,4 +13,12 @@ public interface IChapterService
     Guid chapterId,
     Guid userId,
     CreateChapterVersionRequest request);
+    Task<ChapterResponse> SubmitAsync(
+    Guid chapterId,
+    Guid userId);
+    Task<(byte[] Data, string FileName, string ContentType)> DownloadVersionAsync(
+    Guid chapterId,
+    Guid versionId,
+    Guid userId);
+
 }

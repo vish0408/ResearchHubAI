@@ -56,4 +56,13 @@ public class MeetingsController : ControllerBase
         await _meetingService.DeleteAsync(id, userId);
         return NoContent();
     }
+    [HttpPut("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id)
+    {
+         var userId = User.GetUserId();
+
+         var meeting = await _meetingService.CancelAsync(id, userId);
+
+         return Ok(meeting);
+    }
 }

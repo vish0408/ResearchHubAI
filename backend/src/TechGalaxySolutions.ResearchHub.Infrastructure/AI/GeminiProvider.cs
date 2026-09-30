@@ -35,95 +35,257 @@ public class GeminiProvider : IAIProvider
             key?.Length ?? 0,
             key is { Length: >= 4 } ? key[^4..] : "N/A");
 
-        _httpClient = httpClientFactory.CreateClient(nameof(GeminiProvider));
-        _httpClient.BaseAddress = new Uri(_settings.Endpoint.TrimEnd('/') + "/");
+       _httpClient = httpClientFactory.CreateClient(nameof(GeminiProvider));
+_httpClient.Timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
+_httpClient.BaseAddress = new Uri(_settings.Endpoint.TrimEnd('/') + "/");
     }
 
     public AIProviderType ProviderType => AIProviderType.Gemini;
 
     public bool IsEnabled => !string.IsNullOrEmpty(_settings.ApiKey);
 
-    public async Task<AIResponse> SendAsync(AIRequest request, CancellationToken cancellationToken = default)
+   public async Task<AIResponse> SendAsync(
+    AIRequest request,
+    CancellationToken cancellationToken = default)
+{
+    if (!IsEnabled)
+        throw new AiException(
+            ProviderType,
+            "Gemini provider is not configured (missing API key)");
+
+    var body = BuildRequestBody(request);
+
+    var models = new List<string>();
+
+    if (!string.IsNullOrWhiteSpace(_settings.Model))
+        models.Add(_settings.Model);
+
+    if (_settings.FallbackModels is not null)
     {
-        if (!IsEnabled)
-            throw new AiException(ProviderType, "Gemini provider is not configured (missing API key)");
-
-        var body = BuildRequestBody(request);
-        var model = _settings.Model;
-        var url = $"models/{model}:generateContent?key={_settings.ApiKey}";
-        var timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(timeout);
-
-        return await RetryPolicy.ExecuteWithRetryAsync(
-            async () =>
-            {
-                _logger.LogInformation("Gemini SendAsync -> POST {BaseAddress}{Url}", _httpClient.BaseAddress, url.Replace(_settings.ApiKey, "***"));
-                var bodyJson = JsonSerializer.Serialize(body, JsonOptions);
-                _logger.LogInformation("Gemini SendAsync request body:\n{Body}", bodyJson);
-
-                using var response = await _httpClient.PostAsJsonAsync(url, body, JsonOptions, timeoutCts.Token);
-
-                _logger.LogInformation("Gemini SendAsync response status: {(int)response.StatusCode} {response.ReasonPhrase}", (int)response.StatusCode, response.ReasonPhrase);
-                foreach (var h in response.Headers)
-                {
-                    _logger.LogInformation("Gemini SendAsync response header {Key}: {Value}", h.Key, string.Join(", ", h.Value));
-                }
-
-                var responseBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
-                _logger.LogInformation("Gemini SendAsync response body:\n{Body}", responseBody);
-
-                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                {
-                    var retryAfter = response.Headers.RetryAfter?.Delta;
-                    throw new AiRateLimitException(ProviderType, retryAfter);
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorMsg = $"Gemini API returned {(int)response.StatusCode}";
-                    if (!string.IsNullOrEmpty(responseBody))
-                    {
-                        try
-                        {
-                            using var errorDoc = JsonDocument.Parse(responseBody);
-                            errorMsg = errorDoc.RootElement.TryGetProperty("error", out var err)
-                                && err.TryGetProperty("message", out var msg)
-                                ? msg.GetString() ?? errorMsg
-                                : errorMsg;
-                        }
-                        catch { errorMsg += $": {responseBody[..Math.Min(responseBody.Length, 200)]}"; }
-                    }
-                    throw new AiException(ProviderType, errorMsg, (int)response.StatusCode);
-                }
-
-                var json = JsonSerializer.Deserialize<GeminiResponse>(responseBody, JsonOptions);
-                if (json?.Candidates is null or { Count: 0 })
-                    throw new AiException(ProviderType, "Empty response from Gemini");
-
-                var candidate = json.Candidates[0];
-                var text = candidate.Content?.Parts?.FirstOrDefault()?.Text ?? string.Empty;
-
-                return new AIResponse
-                {
-                    Content = text,
-                    Model = model,
-                    Usage = json.UsageMetadata is null ? null : new AIUsage
-                    {
-                        PromptTokens = json.UsageMetadata.PromptTokenCount,
-                        CompletionTokens = json.UsageMetadata.CandidatesTokenCount,
-                        TotalTokens = json.UsageMetadata.TotalTokenCount,
-                    },
-                    FinishReason = candidate.FinishReason,
-                };
-            },
-            _settings.MaxRetries,
-            _logger,
-            "Gemini.SendAsync",
-            timeoutCts.Token);
+        models.AddRange(
+            _settings.FallbackModels
+                .Where(m => !string.IsNullOrWhiteSpace(m)));
     }
 
+    models = models
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    if (models.Count == 0)
+        throw new AiException(
+            ProviderType,
+            "No Gemini model is configured.");
+
+    AiException? last503Exception = null;
+
+    for (var modelIndex = 0; modelIndex < models.Count; modelIndex++)
+    {
+        var model = models[modelIndex];
+
+        _logger.LogInformation(
+            "Gemini model selected for SendAsync: {Model} ({Current}/{Total})",
+            model,
+            modelIndex + 1,
+            models.Count);
+
+        try
+        {
+            return await SendWithModelAsync(
+                request,
+                body,
+                model,
+                cancellationToken);
+        }
+        catch (AiException ex)
+            when (ex.HttpStatusCode == 503 && modelIndex < models.Count - 1)
+        {
+            last503Exception = ex;
+
+            _logger.LogWarning(
+                "Gemini model {Model} returned HTTP 503 after retries. " +
+                "Trying fallback model {FallbackModel}.",
+                model,
+                models[modelIndex + 1]);
+        }
+    }
+
+    if (last503Exception is not null)
+        throw last503Exception;
+
+    throw new AiException(
+        ProviderType,
+        "Gemini request failed for all configured models.");
+}
+
+private async Task<AIResponse> SendWithModelAsync(
+    AIRequest request,
+    object body,
+    string model,
+    CancellationToken cancellationToken)
+{
+    var url = $"models/{model}:generateContent?key={_settings.ApiKey}";
+    var timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
+
+    using var timeoutCts =
+        CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+    timeoutCts.CancelAfter(timeout);
+
+    return await RetryPolicy.ExecuteWithRetryAsync(
+        async () =>
+        {
+            _logger.LogInformation(
+                "Gemini SendAsync -> POST {BaseAddress}{Url}",
+                _httpClient.BaseAddress,
+                url.Replace(_settings.ApiKey, "***"));
+
+            var bodyJson = JsonSerializer.Serialize(body, JsonOptions);
+
+            _logger.LogInformation(
+                "Gemini SendAsync request body:\n{Body}",
+                bodyJson);
+
+            using var response = await _httpClient.PostAsJsonAsync(
+                url,
+                body,
+                JsonOptions,
+                timeoutCts.Token);
+
+            _logger.LogInformation(
+                "Gemini SendAsync response status: {(int)response.StatusCode} {response.ReasonPhrase}",
+                (int)response.StatusCode,
+                response.ReasonPhrase);
+
+            foreach (var h in response.Headers)
+            {
+                _logger.LogInformation(
+                    "Gemini SendAsync response header {Key}: {Value}",
+                    h.Key,
+                    string.Join(", ", h.Value));
+            }
+
+            var responseBody =
+                await response.Content.ReadAsStringAsync(timeoutCts.Token);
+
+            _logger.LogInformation(
+                "Gemini SendAsync response body:\n{Body}",
+                responseBody);
+
+            // 429 - Rate limit / quota
+            if (response.StatusCode ==
+                System.Net.HttpStatusCode.TooManyRequests)
+            {
+                var retryAfter = response.Headers.RetryAfter?.Delta;
+
+                if (responseBody.Contains(
+                        "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                        StringComparison.OrdinalIgnoreCase)
+                    || responseBody.Contains(
+                        "quota exceeded",
+                        StringComparison.OrdinalIgnoreCase)
+                    || responseBody.Contains(
+                        "quota_exceeded",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new AiException(
+                        ProviderType,
+                        "Gemini daily free-tier quota has been exhausted. " +
+                        "Please wait for the quota to reset or check your " +
+                        "Google AI Studio plan/billing.",
+                        (int)response.StatusCode);
+                }
+
+                throw new AiRateLimitException(
+                    ProviderType,
+                    retryAfter);
+            }
+
+            // Other non-success responses
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorMsg =
+                    $"Gemini API returned {(int)response.StatusCode}";
+
+                if (!string.IsNullOrEmpty(responseBody))
+                {
+                    try
+                    {
+                        using var errorDoc =
+                            JsonDocument.Parse(responseBody);
+
+                        errorMsg =
+                            errorDoc.RootElement.TryGetProperty(
+                                "error",
+                                out var err)
+                            && err.TryGetProperty(
+                                "message",
+                                out var msg)
+                                ? msg.GetString() ?? errorMsg
+                                : errorMsg;
+                    }
+                    catch
+                    {
+                        errorMsg +=
+                            $": {responseBody[..Math.Min(
+                                responseBody.Length,
+                                200)]}";
+                    }
+                }
+
+                throw new AiException(
+                    ProviderType,
+                    errorMsg,
+                    (int)response.StatusCode);
+            }
+
+            // Deserialize successful response
+            var json =
+                JsonSerializer.Deserialize<GeminiResponse>(
+                    responseBody,
+                    JsonOptions);
+
+            if (json?.Candidates is null ||
+                json.Candidates.Count == 0)
+            {
+                throw new AiException(
+                    ProviderType,
+                    "Empty response from Gemini");
+            }
+
+            var candidate = json.Candidates[0];
+
+            var text =
+                candidate.Content?.Parts?
+                    .FirstOrDefault()?.Text
+                ?? string.Empty;
+
+            return new AIResponse
+            {
+                Content = text,
+                Model = model,
+
+                Usage = json.UsageMetadata is null
+                    ? null
+                    : new AIUsage
+                    {
+                        PromptTokens =
+                            json.UsageMetadata.PromptTokenCount,
+
+                        CompletionTokens =
+                            json.UsageMetadata.CandidatesTokenCount,
+
+                        TotalTokens =
+                            json.UsageMetadata.TotalTokenCount,
+                    },
+
+                FinishReason = candidate.FinishReason,
+            };
+        },
+        _settings.MaxRetries,
+        _logger,
+        $"Gemini.SendAsync[{model}]",
+        timeoutCts.Token);
+}
     public async IAsyncEnumerable<AIStreamChunk> StreamAsync(
         AIRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -139,44 +301,124 @@ public class GeminiProvider : IAIProvider
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
-        _logger.LogInformation("Gemini StreamAsync -> POST {BaseAddress}{Url}", _httpClient.BaseAddress, url.Replace(_settings.ApiKey, "***"));
-        var bodyJson = JsonSerializer.Serialize(body, JsonOptions);
-        _logger.LogInformation("Gemini StreamAsync request body:\n{Body}", bodyJson);
+        // _logger.LogInformation("Gemini StreamAsync -> POST {BaseAddress}{Url}", _httpClient.BaseAddress, url.Replace(_settings.ApiKey, "***"));
+        // var bodyJson = JsonSerializer.Serialize(body, JsonOptions);
+        // _logger.LogInformation("Gemini StreamAsync request body:\n{Body}", bodyJson);
 
+        // using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url)
+        // {
+        //     Content = JsonContent.Create(body, options: JsonOptions),
+        // };
+
+        // using var response = await RetryPolicy.ExecuteWithRetryAsync(
+        //     () => _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token),
+        //     _settings.MaxRetries,
+        //     _logger,
+        //     "Gemini.StreamAsync",
+        //     timeoutCts.Token);
+
+        // _logger.LogInformation("Gemini StreamAsync response status: {(int)response.StatusCode} {response.ReasonPhrase}", (int)response.StatusCode, response.ReasonPhrase);
+
+        // if (!response.IsSuccessStatusCode)
+        // {
+        //     var responseBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+        //     _logger.LogError("Gemini StreamAsync error body:\n{Body}", responseBody);
+
+        //     var errorMsg = $"Gemini API returned {(int)response.StatusCode}";
+        //     if (!string.IsNullOrEmpty(responseBody))
+        //     {
+        //         try
+        //         {
+        //             using var errorDoc = JsonDocument.Parse(responseBody);
+        //             errorMsg = errorDoc.RootElement.TryGetProperty("error", out var err)
+        //                 && err.TryGetProperty("message", out var msg)
+        //                 ? msg.GetString() ?? errorMsg
+        //                 : errorMsg;
+        //         }
+        //         catch { errorMsg += $": {responseBody[..Math.Min(responseBody.Length, 200)]}"; }
+        //     }
+        //     throw new AiException(ProviderType, errorMsg, (int)response.StatusCode);
+        // }
+
+
+_logger.LogInformation(
+    "Gemini StreamAsync -> POST {BaseAddress}{Url}",
+    _httpClient.BaseAddress,
+    url.Replace(_settings.ApiKey, "***"));
+
+var bodyJson = JsonSerializer.Serialize(body, JsonOptions);
+_logger.LogInformation("Gemini StreamAsync request body:\n{Body}", bodyJson);
+
+using var response = await RetryPolicy.ExecuteWithRetryAsync(
+    async () =>
+    {
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = JsonContent.Create(body, options: JsonOptions),
         };
 
-        using var response = await RetryPolicy.ExecuteWithRetryAsync(
-            () => _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token),
-            _settings.MaxRetries,
-            _logger,
-            "Gemini.StreamAsync",
+        var result = await _httpClient.SendAsync(
+            httpRequest,
+            HttpCompletionOption.ResponseHeadersRead,
             timeoutCts.Token);
 
-        _logger.LogInformation("Gemini StreamAsync response status: {(int)response.StatusCode} {response.ReasonPhrase}", (int)response.StatusCode, response.ReasonPhrase);
-
-        if (!response.IsSuccessStatusCode)
+        if (result.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
-            var responseBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
-            _logger.LogError("Gemini StreamAsync error body:\n{Body}", responseBody);
+            var retryAfter = result.Headers.RetryAfter?.Delta;
 
-            var errorMsg = $"Gemini API returned {(int)response.StatusCode}";
-            if (!string.IsNullOrEmpty(responseBody))
-            {
-                try
-                {
-                    using var errorDoc = JsonDocument.Parse(responseBody);
-                    errorMsg = errorDoc.RootElement.TryGetProperty("error", out var err)
-                        && err.TryGetProperty("message", out var msg)
-                        ? msg.GetString() ?? errorMsg
-                        : errorMsg;
-                }
-                catch { errorMsg += $": {responseBody[..Math.Min(responseBody.Length, 200)]}"; }
-            }
-            throw new AiException(ProviderType, errorMsg, (int)response.StatusCode);
+            result.Dispose();
+
+            throw new AiRateLimitException(
+                ProviderType,
+                retryAfter);
         }
+
+        return result;
+    },
+    _settings.MaxRetries,
+    _logger,
+    "Gemini.StreamAsync",
+    timeoutCts.Token);
+
+_logger.LogInformation(
+    "Gemini StreamAsync response status: {(int)response.StatusCode} {response.ReasonPhrase}",
+    (int)response.StatusCode,
+    response.ReasonPhrase);
+
+if (!response.IsSuccessStatusCode)
+{
+    var responseBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+
+    _logger.LogError(
+        "Gemini StreamAsync error body:\n{Body}",
+        responseBody);
+
+    var errorMsg = $"Gemini API returned {(int)response.StatusCode}";
+
+    if (!string.IsNullOrEmpty(responseBody))
+    {
+        try
+        {
+            using var errorDoc = JsonDocument.Parse(responseBody);
+
+            errorMsg =
+                errorDoc.RootElement.TryGetProperty("error", out var err)
+                && err.TryGetProperty("message", out var msg)
+                    ? msg.GetString() ?? errorMsg
+                    : errorMsg;
+        }
+        catch
+        {
+            errorMsg += $": {responseBody[..Math.Min(responseBody.Length, 200)]}";
+        }
+    }
+
+    throw new AiException(
+        ProviderType,
+        errorMsg,
+        (int)response.StatusCode);
+}
+
 
         using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
         using var reader = new StreamReader(stream);

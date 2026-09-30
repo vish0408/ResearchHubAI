@@ -34,7 +34,11 @@ public class LiteratureReviewService : ILiteratureReviewService
 
         // Find or create literature review
         var review = await _context.Set<LiteratureReview>()
-            .FirstOrDefaultAsync(l => l.StudentId == userId && l.ResearchArea == request.ResearchArea && l.Status == "Draft");
+    .FirstOrDefaultAsync(l =>
+        l.StudentId == userId &&
+        l.ResearchArea == request.ResearchArea &&
+        l.Status == "Draft" &&
+        !l.IsDeleted);
 
         if (review is null)
         {
@@ -56,7 +60,7 @@ public class LiteratureReviewService : ILiteratureReviewService
             FileType = parseResult.FileType,
             FileSize = request.Content.Length,
             StoragePath = "upload/" + Guid.NewGuid(),
-            ExtractedText = request.Content,
+            ExtractedText = parseResult.ExtractedText,
             Title = parseResult.Title,
             Authors = parseResult.Authors,
             Abstract = parseResult.Abstract,
@@ -73,7 +77,7 @@ public class LiteratureReviewService : ILiteratureReviewService
         await _context.SaveChangesAsync();
 
         // Create chunks
-        var chunks = ChunkText(request.Content, 2000);
+        var chunks = ChunkText(parseResult.ExtractedText, 2000);    
         for (var i = 0; i < chunks.Count; i++)
         {
             _context.Set<DocumentChunk>().Add(new DocumentChunk
@@ -118,7 +122,7 @@ Format with clear section headers using ### markers.";
         var aiRequest = new AIRequest
         {
             Messages = new() { new() { Role = "user", Content = prompt } },
-            Options = new() { Temperature = 0.5, MaxTokens = 4096 },
+            Options = new() { Temperature = 0.5,MaxTokens = 2048 },
         };
 
         var response = await provider.SendAsync(aiRequest);
@@ -138,16 +142,23 @@ Format with clear section headers using ### markers.";
         return MapDocument(doc);
     }
 
-    public async Task<UploadedDocumentResponse> SummarizeDocumentAsync(Guid userId, SummarizeRequest request)
-    {
-        var doc = await _context.Set<UploadedDocument>()
-            .FirstOrDefaultAsync(d => d.Id == request.DocumentId && d.UploadedByUserId == userId)
-            ?? throw new KeyNotFoundException("Document not found");
+   public async Task<UploadedDocumentResponse> SummarizeDocumentAsync(
+    Guid userId,
+    SummarizeRequest request)
+{
+    var doc = await _context.Set<UploadedDocument>()
+        .FirstOrDefaultAsync(
+            d => d.Id == request.DocumentId &&
+                 d.UploadedByUserId == userId)
+        ?? throw new KeyNotFoundException("Document not found");
 
-        var provider = _providerFactory.GetDefaultProvider();
-        var text = doc.ExtractedText.Length > 8000 ? doc.ExtractedText[..8000] : doc.ExtractedText;
+    var provider = _providerFactory.GetDefaultProvider();
 
-        var prompt = $@"You are a research paper summarizer. Generate a comprehensive summary of the following paper.
+    var text = doc.ExtractedText.Length > 8000
+        ? doc.ExtractedText[..8000]
+        : doc.ExtractedText;
+
+    var prompt = $@"You are a research paper summarizer. Generate a comprehensive summary of the following paper.
 
 Include:
 1. EXECUTIVE SUMMARY - 2-3 paragraph overview
@@ -159,30 +170,55 @@ PAPER CONTENT:
 
 Format with ### markers.";
 
-        var aiRequest = new AIRequest
+    var aiRequest = new AIRequest
+    {
+        Messages = new()
         {
-            Messages = new() { new() { Role = "user", Content = prompt } },
-            Options = new() { Temperature = 0.4, MaxTokens = 2048 },
-        };
+            new()
+            {
+                Role = "user",
+                Content = prompt
+            }
+        },
+       Options = new()
+{
+    Temperature = 0.4,
+    MaxTokens = 1024
+},
 
-        var response = await provider.SendAsync(aiRequest);
+    };
 
-        doc.Summary = response.Content;
+    var response = await provider.SendAsync(aiRequest);
 
-        // Also update the parent literature review's executive summary
-        var review = await _context.Set<LiteratureReview>().FirstOrDefaultAsync(l => l.Id == doc.LiteratureReviewId);
-        if (review is not null)
-        {
-            review.ExecutiveSummary = string.IsNullOrEmpty(review.ExecutiveSummary)
-                ? response.Content
-                : review.ExecutiveSummary + "\n\n---\n\n" + response.Content;
-        }
+    // Clean AI response once
+    var cleanedSummary = CleanSummary(response.Content);
 
-        await SaveAnalysisHistory(doc.LiteratureReviewId, "Summarize", text, response.Content, provider.ProviderType.ToString());
+    // Update document summary
+    doc.Summary = cleanedSummary;
 
-        await _context.SaveChangesAsync();
-        return MapDocument(doc);
+    // Update parent literature review summary
+    var review = await _context.Set<LiteratureReview>()
+        .FirstOrDefaultAsync(
+            l => l.Id == doc.LiteratureReviewId);
+
+    if (review is not null)
+    {
+        // Replace instead of appending.
+        // This prevents duplicate summaries on re-analysis.
+        review.ExecutiveSummary = cleanedSummary;
     }
+
+    await SaveAnalysisHistory(
+        doc.LiteratureReviewId,
+        "Summarize",
+        text,
+        response.Content,
+        provider.ProviderType.ToString());
+
+    await _context.SaveChangesAsync();
+
+    return MapDocument(doc);
+}
 
     public async Task<LiteratureReviewResponse> CompareDocumentsAsync(Guid userId, CompareRequest request)
     {
@@ -196,7 +232,7 @@ Format with ### markers.";
         var provider = _providerFactory.GetDefaultProvider();
         var summaries = string.Join("\n\n---\n\n", docs.Select(d =>
             $"Paper: {d.Title ?? d.FileName}\nAbstract: {(d.Abstract ?? d.ExtractedText)[..Math.Min(1500, (d.Abstract ?? d.ExtractedText).Length)]}"));
-
+    
         var prompt = $@"Compare the following research papers and provide:
 
 1. COMPARISON TABLE - Create a markdown table comparing: Research Focus, Methodology, Key Findings, Strengths, Limitations
@@ -231,100 +267,394 @@ Format with ### markers.";
         return MapReview(review);
     }
 
-    public async Task<LiteratureReviewResponse> FindResearchGapsAsync(Guid userId, ResearchGapsRequest request)
+    public async Task<LiteratureReviewResponse> FindResearchGapsAsync(
+    Guid userId,
+    ResearchGapsRequest request)
+{
+    Console.WriteLine(
+        $"[Research Gaps] Started | ReviewId: {request.LiteratureReviewId} | Area: {request.ResearchArea}");
+
+    var provider = _providerFactory.GetDefaultProvider();
+
+    List<UploadedDocument> docs;
+
+    // If a specific literature review was selected,
+    // use only documents belonging to that review.
+    if (request.LiteratureReviewId.HasValue)
     {
-        var provider = _providerFactory.GetDefaultProvider();
-        var existingWork = request.ExistingWorkSummary ?? "";
+        docs = await _context.Set<UploadedDocument>()
+            .Where(d =>
+                d.LiteratureReviewId == request.LiteratureReviewId.Value &&
+                d.UploadedByUserId == userId &&
+                !d.IsDeleted)
+            .ToListAsync();
+    }
+    else
+    {
+        // Otherwise use the student's uploaded literature documents.
+        docs = await _context.Set<UploadedDocument>()
+            .Where(d =>
+                d.UploadedByUserId == userId &&
+                !d.IsDeleted)
+            .OrderByDescending(d => d.CreatedAt)
+            .ToListAsync();
+    }
 
-        if (request.LiteratureReviewId.HasValue)
+    if (docs.Count == 0)
+    {
+        throw new InvalidOperationException(
+            "No uploaded literature documents were found. Please upload literature documents before finding research gaps.");
+    }
+
+    // Build literature context for AI
+    var existingWork = string.Join(
+        "\n\n",
+        docs.Select(d =>
         {
-            var docs = await _context.Set<UploadedDocument>()
-                .Where(d => d.LiteratureReviewId == request.LiteratureReviewId.Value)
-                .ToListAsync();
+            var content =
+                !string.IsNullOrWhiteSpace(d.Summary)
+                    ? d.Summary
+                    : !string.IsNullOrWhiteSpace(d.Abstract)
+                        ? d.Abstract
+                        : d.ExtractedText ?? "";
 
-            existingWork = string.Join("\n\n", docs.Select(d =>
-                $"- {d.Title ?? d.FileName}: {(d.Abstract ?? d.ExtractedText)[..Math.Min(1000, (d.Abstract ?? d.ExtractedText).Length)]}"));
-        }
+            if (content.Length > 1200)
+                content = content[..1200];
 
-        var prompt = $@"You are a research gap analyst. Based on the following existing work in {request.ResearchArea}, identify:
+            return $"- {d.Title ?? d.FileName}: {content}";
+        }));
 
-1. RESEARCH GAPS - List 5-7 specific research gaps not addressed by current work
-2. OPPORTUNITIES - What research opportunities exist in these gaps?
-3. RECOMMENDATIONS - Suggest specific research directions to address each gap
-4. PRIORITY - Rate each gap as High/Medium/Low priority
+        Console.WriteLine(
+    $"[Research Gaps] Existing work preview:\n{existingWork[..Math.Min(existingWork.Length, 2000)]}");
 
-EXISTING WORK:
+    // Keep the AI prompt reasonably small.
+    if (existingWork.Length > 6000)
+        existingWork = existingWork[..6000];
+
+    if (string.IsNullOrWhiteSpace(existingWork))
+    {
+        throw new InvalidOperationException(
+            "The uploaded literature does not contain enough text for research gap analysis.");
+    }
+
+    Console.WriteLine(
+        $"[Research Gaps] Documents: {docs.Count} | Context length: {existingWork.Length}");
+
+    var prompt = $@"You are an academic research gap analyst.
+
+Research area:
+{request.ResearchArea}
+
+Based ONLY on the literature provided below, identify research gaps.
+
+Provide:
+
+1. RESEARCH GAPS
+List 5 specific gaps that are not adequately addressed.
+
+2. OPPORTUNITIES
+Explain the research opportunity associated with each gap.
+
+3. RECOMMENDATIONS
+Suggest a practical research direction for each gap.
+
+4. PRIORITY
+Rate each gap as High, Medium, or Low.
+
+IMPORTANT:
+- Do not invent information that is not supported by the provided literature.
+- Clearly distinguish established findings from possible research opportunities.
+- Keep the response concise and academically useful.
+
+EXISTING LITERATURE:
 {existingWork}
+";
 
-Format with ### markers.";
-
-        var aiRequest = new AIRequest
+    var aiRequest = new AIRequest
+    {
+        Messages = new()
         {
-            Messages = new() { new() { Role = "user", Content = prompt } },
-            Options = new() { Temperature = 0.6, MaxTokens = 4096 },
-        };
-
-        var response = await provider.SendAsync(aiRequest);
-
-        LiteratureReview review;
-        if (request.LiteratureReviewId.HasValue)
+            new()
+            {
+                Role = "user",
+                Content = prompt
+            }
+        },
+        Options = new()
         {
-            review = await _context.Set<LiteratureReview>()
-                .FirstOrDefaultAsync(l => l.Id == request.LiteratureReviewId.Value)
-                ?? throw new KeyNotFoundException("Literature review not found");
+            Temperature = 0.4,
+            MaxTokens = 2500
         }
-        else
+    };
+
+    Console.WriteLine("[Research Gaps] Sending request to AI...");
+    
+    Console.WriteLine(
+    $"[Research Gaps] Prompt contains EXISTING LITERATURE: " +
+    $"{prompt.Contains("EXISTING LITERATURE:", StringComparison.OrdinalIgnoreCase)}");
+
+Console.WriteLine(
+    $"[Research Gaps] Prompt length: {prompt.Length}");
+    var response = await provider.SendAsync(aiRequest);
+
+    Console.WriteLine("[Research Gaps] AI response received.");
+
+    LiteratureReview review;
+
+    if (request.LiteratureReviewId.HasValue)
+    {
+        review = await _context.Set<LiteratureReview>()
+            .FirstOrDefaultAsync(
+                l => l.Id == request.LiteratureReviewId.Value &&
+                     l.StudentId == userId &&
+                     !l.IsDeleted)
+            ?? throw new KeyNotFoundException(
+                "Literature review not found");
+    }
+    else
+    {
+        review = await _context.Set<LiteratureReview>()
+            .FirstOrDefaultAsync(
+                l =>
+                    l.StudentId == userId &&
+                    l.ResearchArea == request.ResearchArea &&
+                    l.Status == "Draft" &&
+                    !l.IsDeleted);
+
+        if (review is null)
         {
             review = new LiteratureReview
             {
                 StudentId = userId,
-                Title = $"Research Gaps - {request.ResearchArea}",
+                Title = $"Literature Review - {request.ResearchArea}",
                 ResearchArea = request.ResearchArea,
+                Status = "Draft"
             };
+
             _context.Set<LiteratureReview>().Add(review);
         }
-
-        review.ResearchGaps = response.Content;
-
-        if (request.LiteratureReviewId.HasValue)
-            await SaveAnalysisHistory(request.LiteratureReviewId.Value, "ResearchGaps", existingWork, response.Content, provider.ProviderType.ToString());
-
-        await _context.SaveChangesAsync();
-        return MapReview(review);
     }
 
-    public async Task<UploadedDocumentResponse> ExtractKeywordsAsync(Guid userId, ExtractKeywordsRequest request)
+    review.ResearchGaps = CleanResearchGaps(response.Content);
+
+    if (request.LiteratureReviewId.HasValue)
     {
-        var doc = await _context.Set<UploadedDocument>()
-            .FirstOrDefaultAsync(d => d.Id == request.DocumentId && d.UploadedByUserId == userId)
-            ?? throw new KeyNotFoundException("Document not found");
-
-        var provider = _providerFactory.GetDefaultProvider();
-        var text = (doc.Abstract ?? doc.ExtractedText)[..Math.Min(5000, (doc.Abstract ?? doc.ExtractedText).Length)];
-
-        var prompt = $@"Extract key terms from the following research paper.
-
-Return a comma-separated list of 10-15 key terms covering: research domain, methodology, techniques, tools, and evaluation metrics.
-
-Only return the keywords list, nothing else.
-
-PAPER TEXT:
-{text}";
-
-        var aiRequest = new AIRequest
-        {
-            Messages = new() { new() { Role = "user", Content = prompt } },
-            Options = new() { Temperature = 0.3, MaxTokens = 500 },
-        };
-
-        var response = await provider.SendAsync(aiRequest);
-        doc.Keywords = response.Content.Trim();
-
-        await SaveAnalysisHistory(doc.LiteratureReviewId, "ExtractKeywords", text, response.Content, provider.ProviderType.ToString());
-        await _context.SaveChangesAsync();
-
-        return MapDocument(doc);
+        await SaveAnalysisHistory(
+            review.Id,
+            "ResearchGaps",
+            existingWork,
+            response.Content,
+            provider.ProviderType.ToString());
     }
+
+    await _context.SaveChangesAsync();
+
+    // Reload documents so MapReview gets them.
+    await _context.Entry(review)
+        .Collection(r => r.Documents)
+        .LoadAsync();
+
+    return MapReview(review);
+}
+// 
+private static string CleanResearchGaps(string content)
+{
+    if (string.IsNullOrWhiteSpace(content))
+        return string.Empty;
+
+    var result = content.Trim();
+
+    result = result
+        .Replace("### 1. RESEARCH GAPS", "1. RESEARCH GAPS", StringComparison.OrdinalIgnoreCase)
+        .Replace("### 2. OPPORTUNITIES", "2. OPPORTUNITIES", StringComparison.OrdinalIgnoreCase)
+        .Replace("### 3. RECOMMENDATIONS", "3. RECOMMENDATIONS", StringComparison.OrdinalIgnoreCase)
+        .Replace("### 4. PRIORITY", "4. PRIORITY", StringComparison.OrdinalIgnoreCase)
+        .Replace("### RESEARCH GAPS", "RESEARCH GAPS", StringComparison.OrdinalIgnoreCase)
+        .Replace("### OPPORTUNITIES", "OPPORTUNITIES", StringComparison.OrdinalIgnoreCase)
+        .Replace("### RECOMMENDATIONS", "RECOMMENDATIONS", StringComparison.OrdinalIgnoreCase)
+        .Replace("### PRIORITY", "PRIORITY", StringComparison.OrdinalIgnoreCase);
+
+    result = result.Replace("---", "");
+
+    result = System.Text.RegularExpressions.Regex.Replace(
+        result,
+        @"\*\*(.*?)\*\*",
+        "$1");
+
+    return result.Trim();
+}
+
+
+public async Task<UploadedDocumentResponse> ExtractKeywordsAsync(
+    Guid userId,
+    ExtractKeywordsRequest request)
+{
+    var doc = await _context.Set<UploadedDocument>()
+        .FirstOrDefaultAsync(
+            d => d.Id == request.DocumentId &&
+                 d.UploadedByUserId == userId)
+        ?? throw new KeyNotFoundException("Document not found");
+
+    var provider = _providerFactory.GetDefaultProvider();
+
+    var sourceText = doc.Abstract ?? doc.ExtractedText;
+
+    var text = sourceText.Length > 5000
+        ? sourceText[..5000]
+        : sourceText;
+
+    var prompt = $"""
+        You are an expert academic research assistant.
+
+        Extract 10-15 concise and meaningful KEYWORDS from the research paper below.
+
+        IMPORTANT RULES:
+        - Return ONLY the keywords.
+        - Return them as a comma-separated list.
+        - Each keyword must be a short research term or noun phrase.
+        - Prefer 1-5 words per keyword.
+        - Do NOT return sentences.
+        - Do NOT return explanations.
+        - Do NOT include numbering such as "1.", "2.", "10.", etc.
+        - Do NOT include section numbers.
+        - Do NOT copy numbered headings from the paper.
+        - Do NOT include long phrases from the paper.
+        - Do NOT include parenthetical explanations.
+        - Focus on:
+          * research domain
+          * methodology
+          * techniques
+          * tools
+          * algorithms
+          * evaluation methods
+          * important concepts
+
+        GOOD EXAMPLE:
+        Software Testing, Embedded Systems, Test Case Generation, Black-box Testing, White-box Testing, Verification, Validation, Software Quality
+
+        BAD EXAMPLE:
+        10. Test case generation (Technique/Tool aspect) 11. Verification and Validation
+
+        PAPER TEXT:
+        {text}
+        """;
+
+    var aiRequest = new AIRequest
+    {
+        Messages = new()
+        {
+            new()
+            {
+                Role = "user",
+                Content = prompt
+            }
+        },
+        Options = new()
+        {
+            Temperature = 0.2,
+            MaxTokens = 300
+        }
+    };
+
+    var response = await provider.SendAsync(aiRequest);
+
+    var keywords = CleanKeywords(response.Content);
+
+    doc.Keywords = string.Join(", ", keywords);
+
+    await SaveAnalysisHistory(
+        doc.LiteratureReviewId,
+        "ExtractKeywords",
+        text,
+        doc.Keywords,
+        provider.ProviderType.ToString());
+
+    await _context.SaveChangesAsync();
+
+    return MapDocument(doc);
+}
+
+
+private static List<string> CleanKeywords(string content)
+{
+    if (string.IsNullOrWhiteSpace(content))
+        return new List<string>();
+
+    var items = content
+        .Replace("\r", "")
+        .Split(new[] { ',', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries)
+        .Select(x => x.Trim())
+        .ToList();
+
+    var keywords = new List<string>();
+
+    foreach (var item in items)
+    {
+        var keyword = item;
+
+        // Remove numbering: "10. Test case generation"
+        keyword = System.Text.RegularExpressions.Regex.Replace(
+            keyword,
+            @"^\s*\d+[\.\)\-:]\s*",
+            "");
+
+        // Remove markdown bullets
+        keyword = System.Text.RegularExpressions.Regex.Replace(
+            keyword,
+            @"^\s*[-*•]\s*",
+            "");
+
+        // Remove parenthetical explanations
+        keyword = System.Text.RegularExpressions.Regex.Replace(
+            keyword,
+            @"\s*\([^)]*\)",
+            "");
+
+        keyword = keyword.Trim(
+            ' ', '"', '\'', '.', ':', '-', '–', '—');
+
+        // Remove common AI instruction leakage
+        var lower = keyword.ToLowerInvariant();
+
+        if (lower.Contains("potential candidates") ||
+            lower.Contains("noun phrases") ||
+            lower.Contains("keywords") ||
+            lower.Contains("key terms") ||
+            lower.Contains("key concepts") ||
+            lower.Contains("here are") ||
+            lower.Contains("possible keywords"))
+        {
+            continue;
+        }
+
+        // Ignore empty values
+        if (string.IsNullOrWhiteSpace(keyword))
+            continue;
+
+        // Keep keywords concise
+        var wordCount = keyword
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Length;
+
+        if (wordCount > 6)
+            continue;
+
+        if (keyword.Length > 80)
+            continue;
+
+        // Avoid duplicate keywords
+        if (!keywords.Contains(keyword, StringComparer.OrdinalIgnoreCase))
+        {
+            keywords.Add(keyword);
+        }
+
+        if (keywords.Count == 15)
+            break;
+    }
+
+    return keywords;
+}
+
 
     public async Task<LiteratureReviewResponse> GenerateRelatedWorkAsync(Guid userId, GenerateRelatedWorkRequest request)
     {
@@ -389,16 +719,49 @@ Write 3-5 paragraphs of formal academic text.";
         return MapReview(review);
     }
 
-    public async Task<List<LiteratureReviewResponse>> GetHistoryAsync(Guid userId)
-    {
-        var reviews = await _context.Set<LiteratureReview>().AsNoTracking()
-            .Include(l => l.Documents)
-            .Where(l => l.StudentId == userId && !l.IsDeleted)
-            .OrderByDescending(l => l.CreatedAt)
-            .ToListAsync();
+    // public async Task<List<LiteratureReviewResponse>> GetHistoryAsync(Guid userId)
+    // {
+    //     var reviews = await _context.Set<LiteratureReview>().AsNoTracking()
+    //         .Include(l => l.Documents)
+    //         .Where(l => l.StudentId == userId && !l.IsDeleted)
+    //         .OrderByDescending(l => l.CreatedAt)
+    //         .ToListAsync();
 
-        return reviews.Select(MapReview).ToList();
+    //     return reviews.Select(MapReview).ToList();
+    // }
+
+
+     public async Task<List<LiteratureReviewResponse>> GetHistoryAsync(Guid userId)
+{
+    var allReviews = await _context.Set<LiteratureReview>()
+        .AsNoTracking()
+        .ToListAsync();
+
+    Console.WriteLine($"[Literature History] Total DB Reviews: {allReviews.Count}");
+
+    foreach (var item in allReviews)
+    {
+        Console.WriteLine(
+            $"ReviewId: {item.Id} | " +
+            $"StudentId: {item.StudentId} | " +
+            $"IsDeleted: {item.IsDeleted} | " +
+            $"Title: {item.Title}"
+        );
     }
+
+    var reviews = await _context.Set<LiteratureReview>()
+        .AsNoTracking()
+        .Include(l => l.Documents)
+        .Where(l => l.StudentId == userId && !l.IsDeleted)
+        .OrderByDescending(l => l.CreatedAt)
+        .ToListAsync();
+
+    Console.WriteLine($"[Literature History] Matching Reviews: {reviews.Count}");
+
+    return reviews.Select(MapReview).ToList();
+}
+
+
 
     public async Task<LiteratureReviewResponse> GetByIdAsync(Guid id, Guid userId)
     {
@@ -450,6 +813,28 @@ Write 3-5 paragraphs of formal academic text.";
         return chunks;
     }
 
+private static string CleanSummary(string content)
+{
+    if (string.IsNullOrWhiteSpace(content))
+        return string.Empty;
+
+    var result = content.Trim();
+
+    result = result
+        .Replace("### EXECUTIVE SUMMARY", "Executive Summary", StringComparison.OrdinalIgnoreCase)
+        .Replace("### KEY FINDINGS", "Key Findings", StringComparison.OrdinalIgnoreCase)
+        .Replace("### MAIN CONCLUSION", "Main Conclusion", StringComparison.OrdinalIgnoreCase)
+        .Replace("---", "")
+        .Replace("\\*", "*");
+
+    result = System.Text.RegularExpressions.Regex.Replace(
+        result,
+        @"\*\*(.*?)\*\*",
+        "$1");
+
+    return result.Trim();
+}
+
     private static string ExtractSection(string content, string sectionName)
     {
         var idx = content.IndexOf($"### {sectionName}", StringComparison.OrdinalIgnoreCase);
@@ -495,18 +880,21 @@ Write 3-5 paragraphs of formal academic text.";
     };
 
     private static LiteratureReviewResponse MapReview(LiteratureReview r) => new()
-    {
-        Id = r.Id,
-        Title = r.Title,
-        ResearchArea = r.ResearchArea,
-        ExecutiveSummary = r.ExecutiveSummary,
-        ResearchGaps = r.ResearchGaps,
-        RelatedWork = r.RelatedWork,
-        ComparisonResults = r.ComparisonResults,
-        Status = r.Status ?? "Draft",
-        DocumentCount = r.Documents?.Count ?? 0,
-        CreatedAt = r.CreatedAt,
-        UpdatedAt = r.UpdatedAt,
-        Documents = r.Documents?.Select(MapDocument).ToList() ?? new(),
-    };
+{
+    Id = r.Id,
+    Title = r.Title,
+    ResearchArea = r.ResearchArea,
+
+   ExecutiveSummary = CleanSummary(r.ExecutiveSummary ?? ""),
+ResearchGaps = CleanResearchGaps(r.ResearchGaps ?? ""),
+
+    RelatedWork = r.RelatedWork,
+    ComparisonResults = r.ComparisonResults,
+    Status = r.Status ?? "Draft",
+    DocumentCount = r.Documents?.Count ?? 0,
+    CreatedAt = r.CreatedAt,
+    UpdatedAt = r.UpdatedAt,
+
+    Documents = r.Documents?.Select(MapDocument).ToList() ?? new(),
+};
 }

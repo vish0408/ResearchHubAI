@@ -173,6 +173,12 @@ export type ChapterVersion = {
   chapterId: string;
   versionNumber: number;
   content: string;
+
+  fileName: string | null;
+  filePath: string | null;
+  fileType: string | null;
+  fileSize: number | null;
+
   status: string;
   createdAt: string;
 };

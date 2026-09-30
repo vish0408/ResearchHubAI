@@ -4,7 +4,8 @@ import {
   Calendar,
   CheckCircle,
   Clock,
-  Plus
+  Plus,
+  Trash2
 } from "lucide-react";
 import StatCard from "../../components/cards/StatCard";
 import Badge from "../../components/common/Badge";
@@ -26,15 +27,19 @@ export default function GuideMeetingScheduler() {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchMeetings = async () => {
-    try {
-      const m = await guideService.getMyMeetings();
-      setMeetings(m);
-    } catch (e) {
-      console.error("Failed to load meetings", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const m = await guideService.getMyMeetings();
+
+    console.log("GUIDE MEETINGS API RESPONSE:", m);
+
+    setMeetings(m);
+  } catch (e) {
+    console.error("Failed to load meetings", e);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => { fetchMeetings(); }, []);
 
@@ -57,6 +62,33 @@ export default function GuideMeetingScheduler() {
     }
   };
 
+
+  const handleDeleteMeeting = async (id: string) => {
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this meeting?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await guideService.deleteMeeting(id);
+
+    // Remove deleted meeting from UI
+    setMeetings(prev => prev.filter(m => m.id !== id));
+
+    alert("Meeting deleted successfully.");
+  } catch (e) {
+    console.error("Failed to delete meeting", e);
+    alert("Failed to delete meeting.");
+  }
+};
+
+  const parseMeetingDate = (value: string) => {
+  // API stores meeting time as UTC but may omit the Z suffix.
+  const normalized = /Z$/i.test(value) ? value : `${value}Z`;
+  return new Date(normalized);
+};
+
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -64,8 +96,8 @@ export default function GuideMeetingScheduler() {
   const startDay = new Date(year, month, 1).getDay();
 
   const meetingDates = new Set(
-    meetings.map(m => new Date(m.scheduledAt).getDate())
-  );
+  meetings.map(m => parseMeetingDate(m.scheduledAt).getDate())
+);
 
   const today = now.getDate();
 
@@ -75,13 +107,19 @@ export default function GuideMeetingScheduler() {
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-  const thisWeekMeetings = meetings.filter(m => {
-    const d = new Date(m.scheduledAt);
-    return d >= startOfWeek && d < endOfWeek;
-  }).length;
-  const thisMonthMeetings = meetings.filter(m => new Date(m.scheduledAt).getMonth() === month).length;
+const thisWeekMeetings = meetings.filter(m => {
+  const d = parseMeetingDate(m.scheduledAt);
+  return d >= startOfWeek && d < endOfWeek;
+}).length;
+const thisMonthMeetings = meetings.filter(
+  m => parseMeetingDate(m.scheduledAt).getMonth() === month
+).length;
 
-  const upcomingMeetings = meetings.filter(m => new Date(m.scheduledAt) >= now && (m.status || "").toLowerCase() === "scheduled").length;
+const upcomingMeetings = meetings.filter(
+  m =>
+    parseMeetingDate(m.scheduledAt) >= now &&
+    (m.status || "").toLowerCase() === "scheduled"
+).length;
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -90,7 +128,11 @@ export default function GuideMeetingScheduler() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="Today" value={meetings.filter(m => new Date(m.scheduledAt).toDateString() === now.toDateString()).length.toString()} icon={Calendar} color="bg-indigo-500"/>
+        <StatCard label="Today" value={meetings.filter(
+  m =>
+    parseMeetingDate(m.scheduledAt).toDateString() ===
+    now.toDateString()
+).length.toString()} icon={Calendar} color="bg-indigo-500"/>
         <StatCard label="This Week" value={thisWeekMeetings.toString()} icon={Activity} color="bg-blue-500"/>
         <StatCard label="Upcoming" value={upcomingMeetings.toString()} icon={Clock} color="bg-amber-500"/>
         <StatCard label="Total (Month)" value={thisMonthMeetings.toString()} icon={CheckCircle} color="bg-green-500"/>
@@ -116,10 +158,29 @@ export default function GuideMeetingScheduler() {
             {meetings.map((m,i)=>(
               <div key={m.id} className={`flex items-center gap-4 p-3 border border-border rounded-xl hover:bg-muted/30 ${i>0?"mt-2":""}`}>
                 <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl flex items-center justify-center flex-shrink-0"><Calendar className="w-5 h-5 text-indigo-600"/></div>
-                <div className="flex-1"><p className="font-bold text-sm text-foreground">{m.title}</p><p className="text-xs text-muted-foreground">{new Date(m.scheduledAt).toLocaleDateString()} · {new Date(m.scheduledAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} · {m.durationMinutes}min</p></div>
+                <div className="flex-1"><p className="font-bold text-sm text-foreground">{m.title}</p><p className="text-xs text-muted-foreground">
+  {parseMeetingDate(m.scheduledAt).toLocaleDateString("en-IN")} ·{" "}
+  {parseMeetingDate(m.scheduledAt).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })} · {m.durationMinutes}min
+</p></div>
                 <div className="flex items-center gap-2">
                   <Badge variant={(m.status||"").toLowerCase()==="scheduled"?"info":(m.status||"").toLowerCase()==="completed"?"success":"warning"}>{m.status}</Badge>
-                  {m.meetingLink&&<button className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-700">Join</button>}
+                  {m.meetingLink && (
+  <button className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-700">
+    Join
+  </button>
+)}
+
+<button
+  onClick={() => handleDeleteMeeting(m.id)}
+  className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+  title="Delete meeting"
+>
+  <Trash2 className="w-4 h-4" />
+</button>
                 </div>
               </div>
             ))}

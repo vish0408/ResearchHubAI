@@ -136,20 +136,24 @@ class ApiClient {
   }
 
   async post<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
-    return this.autoRetryOnExpiry(async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      try {
-        const response = await fetch(`${this.baseUrl}${path}`, {
-          method: "POST",
-          headers: this.getHeaders(),
-          body: body ? JSON.stringify(body) : undefined,
-          signal: controller.signal,
-        });
-        return this.handleResponse<T>(response);
-      } finally { clearTimeout(timeout); }
-    });
-  }
+  return this.autoRetryOnExpiry(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000);
+
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      return this.handleResponse<T>(response);
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+}
 
   async put<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.autoRetryOnExpiry(async () => {

@@ -42,6 +42,23 @@ public class NotificationsController : ControllerBase
         return Ok(notification);
     }
 
+    [HttpPost("send")]
+[Authorize(Roles = "Guide")]
+public async Task<IActionResult> SendToUser(
+    [FromBody] SendNotificationRequest request)
+{
+    
+    Console.WriteLine($"RecipientId received: {request.RecipientId}");
+
+    var notification = await _notificationService.SendToUserAsync(
+        request.RecipientId,
+        request.Title,
+        request.Message,
+        request.Type);
+
+    return Ok(notification);
+}
+
     [HttpPut("mark-read")]
     public async Task<IActionResult> MarkAsRead([FromBody] MarkReadRequest request)
     {

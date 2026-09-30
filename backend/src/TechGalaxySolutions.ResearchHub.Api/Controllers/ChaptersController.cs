@@ -24,20 +24,39 @@ public class ChaptersController : ControllerBase
         return Ok(chapters);
     }
 
+    [HttpGet("{id:guid}/versions/{versionId:guid}/download")]
+public async Task<IActionResult> DownloadVersion(
+    Guid projectId,
+    Guid id,
+    Guid versionId)
+{
+    var userId = User.GetUserId();
+
+    var result = await _chapterService.DownloadVersionAsync(
+        id,
+        versionId,
+        userId);
+
+    return File(
+        result.Data,
+        result.ContentType,
+        result.FileName);
+}
+
     [HttpPost]
-    public async Task<IActionResult> Create(
-        Guid projectId,
-        [FromBody] CreateChapterRequest request)
-    {
-        var userId = User.GetUserId();
+public async Task<IActionResult> Create(
+    Guid projectId,
+    [FromForm] CreateChapterRequest request)
+{
+    var userId = User.GetUserId();
 
-        var chapter = await _chapterService.CreateAsync(
-            projectId,
-            userId,
-            request);
+    var chapter = await _chapterService.CreateAsync(
+        projectId,
+        userId,
+        request);
 
-        return Ok(chapter);
-    }
+    return Ok(chapter);
+}
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid projectId, Guid id)
@@ -58,7 +77,7 @@ public class ChaptersController : ControllerBase
 public async Task<IActionResult> CreateVersion(
     Guid projectId,
     Guid id,
-    [FromBody] CreateChapterVersionRequest request)
+    [FromForm] CreateChapterVersionRequest request)
 {
     var userId = User.GetUserId();
 
@@ -69,6 +88,22 @@ public async Task<IActionResult> CreateVersion(
 
     return Ok(version);
 }
+
+[HttpPost("{id:guid}/submit")]
+public async Task<IActionResult> Submit(
+    Guid projectId,
+    Guid id)
+{
+    var userId = User.GetUserId();
+
+    var chapter = await _chapterService.SubmitAsync(
+        id,
+        userId);
+
+    return Ok(chapter);
+}
+
+
 
     [HttpPut("{id:guid}/status")]
     public async Task<IActionResult> UpdateStatus(
