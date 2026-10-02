@@ -11,5 +11,11 @@ public class ChapterVersion : BaseEntity
 
     public string Content { get; set; } = string.Empty;
 
+    // Uploaded chapter document
+    public string? FileName { get; set; }
+    public string? FilePath { get; set; }
+    public string? FileType { get; set; }
+    public long? FileSize { get; set; }
+
     public ChapterStatus Status { get; set; } = ChapterStatus.Draft;
 }

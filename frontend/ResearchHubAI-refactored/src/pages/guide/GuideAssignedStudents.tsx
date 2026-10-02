@@ -1,3 +1,4 @@
+import CourseworkManager from "../../components/admin/CourseworkManager";
 import { useEffect, useState } from "react";
 import {
   Award,
@@ -16,12 +17,14 @@ import Badge from "../../components/common/Badge";
 import Card from "../../components/common/Card";
 import ProgressBar from "../../components/common/ProgressBar";
 import { guideService } from "../../services/GuideService";
-import { GuideDashboardData } from "../../types/Guide";
+import { AssignedStudentSummary, GuideDashboardData } from "../../types/Guide";
 
 export default function GuideAssignedStudents() {
   const [data, setData] = useState<GuideDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<AssignedStudentSummary | null>(null);
+  const [showCoursework, setShowCoursework] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -82,13 +85,206 @@ export default function GuideAssignedStudents() {
                   <td className="px-5 py-3.5 text-xs text-muted-foreground">{s.enrollment}</td>
                   <td className="px-5 py-3.5 min-w-[120px]"><div className="flex items-center gap-2"><ProgressBar value={s.completionPercentage} color={s.completionPercentage>70?"bg-green-500":s.completionPercentage>40?"bg-blue-500":"bg-amber-500"} h="h-1.5"/><span className="text-xs font-bold w-8">{s.completionPercentage}%</span></div></td>
                   <td className="px-5 py-3.5"><Badge variant={s.completionPercentage>70?"success":s.completionPercentage>40?"warning":"danger"}>{s.projectStatus||"active"}</Badge></td>
-                  <td className="px-5 py-3.5"><div className="flex gap-1">{[Eye,MessageCircle,Calendar].map((Icon,j)=><button key={j} className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center"><Icon className="w-3.5 h-3.5 text-muted-foreground"/></button>)}</div></td>
+              
+              
+              <td className="px-5 py-3.5">
+  <div className="flex gap-1">
+
+    {/* Eye - View Student */}
+    <button
+  type="button"
+  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center"
+  onClick={() => setSelectedStudent(s)}
+>
+  <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+</button>
+
+    {/* Message */}
+    
+<button
+  type="button"
+  onClick={() => {
+    const message = window.prompt(
+      `Message to ${s.fullName}:`
+    );
+
+    if (!message?.trim()) return;
+
+    guideService
+      .sendNotification(
+        s.userId,
+        "Message from Guide",
+        message.trim(),
+        "GuideMessage"
+      )
+      .then(() => {
+        alert("Message sent successfully.");
+      })
+      .catch((error) => {
+        console.error("Failed to send message:", error);
+        alert("Failed to send message.");
+      });
+  }}
+  className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center"
+>
+  <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
+</button>
+
+    {/* Calendar */}
+    <button
+      className="w-7 h-7 rounded-lg hover:bg-muted flex items-center justify-center"
+    >
+      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+    </button>
+
+  </div>
+</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-background shadow-2xl border border-border">
+
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">
+                  Student Details
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Research student information
+                </p>
+              </div>
+
+              <button
+                type="button"
+               onClick={() => {
+  setSelectedStudent(null);
+  setShowCoursework(false);
+}}
+                className="w-8 h-8 rounded-lg hover:bg-muted text-muted-foreground"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+
+              <div>
+                <p className="text-xs text-muted-foreground">Name</p>
+                <p className="font-semibold text-foreground">
+                  {selectedStudent?.fullName}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="text-sm text-foreground">
+                  {selectedStudent?.email}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Enrollment</p>
+                <p className="text-sm text-foreground">
+                  {selectedStudent?.enrollment}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Department</p>
+                <p className="text-sm text-foreground">
+                  {selectedStudent?.department}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Research Topic</p>
+                <p className="text-sm text-foreground">
+                  {selectedStudent?.researchTopic}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Project</p>
+                <p className="text-sm text-foreground">
+                  {selectedStudent?.projectTitle || "No project"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl bg-muted p-3">
+                  <p className="text-xs text-muted-foreground">Progress</p>
+                  <p className="font-bold text-foreground">
+                    {selectedStudent?.completionPercentage}%
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-muted p-3">
+                  <p className="text-xs text-muted-foreground">Chapters</p>
+                  <p className="font-bold text-foreground">
+                    {selectedStudent?.totalChapters}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-muted p-3">
+                  <p className="text-xs text-muted-foreground">Approved</p>
+                  <p className="font-bold text-foreground">
+                    {selectedStudent?.approvedChapters}
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2">
+  <button
+    type="button"
+    onClick={() => setShowCoursework(true)}
+    className="w-full rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold hover:opacity-90"
+  >
+    View Coursework
+  </button>
+</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCoursework && selectedStudent && (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+    <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl bg-background shadow-2xl border border-border">
+
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">
+            Coursework
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {selectedStudent.fullName}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowCoursework(false)}
+          className="w-8 h-8 rounded-lg hover:bg-muted text-muted-foreground"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="p-6">
+        <CourseworkManager
+          studentUserId={selectedStudent.userId}
+        />
+      </div>
+
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
+

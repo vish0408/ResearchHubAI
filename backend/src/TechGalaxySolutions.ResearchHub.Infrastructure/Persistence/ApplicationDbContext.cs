@@ -125,13 +125,25 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(pm => pm.Project).WithMany(p => p.Members).HasForeignKey(pm => pm.ProjectId);
             entity.HasOne(pm => pm.User).WithMany().HasForeignKey(pm => pm.UserId).OnDelete(DeleteBehavior.NoAction);
         });
+modelBuilder.Entity<TaskItem>(entity =>
+{
+    entity.HasOne(t => t.Project)
+        .WithMany(p => p.Tasks)
+        .HasForeignKey(t => t.ProjectId);
 
-        modelBuilder.Entity<TaskItem>(entity =>
-        {
-            entity.HasOne(t => t.Project).WithMany(p => p.Tasks).HasForeignKey(t => t.ProjectId);
-            entity.HasOne(t => t.AssignedTo).WithMany().HasForeignKey(t => t.AssignedToId).OnDelete(DeleteBehavior.NoAction);
-            entity.HasIndex(t => t.ProjectId).HasDatabaseName("IX_TaskItems_ProjectId");
-        });
+    entity.HasOne(t => t.AssignedTo)
+        .WithMany()
+        .HasForeignKey(t => t.AssignedToId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+entity.HasOne(t => t.Milestone)
+    .WithMany(m => m.Tasks)
+    .HasForeignKey(t => t.MilestoneId)
+    .OnDelete(DeleteBehavior.NoAction);
+    
+    entity.HasIndex(t => t.ProjectId)
+        .HasDatabaseName("IX_TaskItems_ProjectId");
+});
 
         modelBuilder.Entity<Milestone>(entity =>
         {

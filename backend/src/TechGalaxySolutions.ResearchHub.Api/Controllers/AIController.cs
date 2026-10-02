@@ -109,7 +109,7 @@ public class AIController : ControllerBase
     {
         AIProviderType.OpenAI => "gpt-4o",
         AIProviderType.Anthropic => "claude-3-opus-20240229",
-        AIProviderType.Gemini => "gemini-2.0-flash",
+        AIProviderType.Gemini => "gemini-3.6-flash",
         _ => "unknown",
     };
 }

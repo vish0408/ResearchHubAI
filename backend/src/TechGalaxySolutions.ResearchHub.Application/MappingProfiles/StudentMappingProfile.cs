@@ -15,10 +15,17 @@ public class StudentMappingProfile : Profile
 {
     public StudentMappingProfile()
     {
-        CreateMap<StudentProfile, StudentProfileResponse>()
-            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User.FullName))
-            .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
-            .ForMember(dest => dest.GuideName, opt => opt.MapFrom(src => src.Guide != null ? src.Guide.FullName : null));
+      CreateMap<StudentProfile, StudentProfileResponse>()
+    .ForMember(
+        dest => dest.FullName,
+        opt => opt.MapFrom(src => src.User.FullName))
+    .ForMember(
+        dest => dest.Email,
+        opt => opt.MapFrom(src => src.User.Email))
+    .ForMember(
+        dest => dest.GuideName,
+        opt => opt.MapFrom(src =>
+            src.Guide != null ? src.Guide.FullName : null));
 
         CreateMap<Project, ProjectResponse>()
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))

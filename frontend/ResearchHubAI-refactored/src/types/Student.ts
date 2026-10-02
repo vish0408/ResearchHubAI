@@ -1,14 +1,15 @@
 export interface StudentProfileDto {
-  id: string;
-  userId: string;
-  fullName: string;
-  email: string;
-  enrollment: string;
-  department: string;
-  institution: string;
-  researchTopic: string | null;
-  guideId: string | null;
-  guideName: string | null;
+  id?: string;
+  fullName?: string;
+  email?: string;
+  enrollment?: string;
+  department?: string;
+  institution?: string;
+  researchTopic?: string;
+  guideId?: string | null;
+  guideName?: string | null;
+
+  profilePictureUrl?: string | null;
 }
 
 export interface Project {

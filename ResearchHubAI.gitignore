@@ -1,0 +1,45 @@
+backend/src/TechGalaxySolutions.ResearchHub.Api/Controllers/NotificationsController.cs:50: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Api/Controllers/StudentProfileController.cs:49: trailing whitespace.
+[32m+[m[32m}[m[41m   [m
+backend/src/TechGalaxySolutions.ResearchHub.Application/DTOs/Task/TaskItemResponse.cs:16: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Persistence/ApplicationDbContext.cs:143: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Persistence/DbInitializer.cs:13: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/DashboardService.cs:98: trailing whitespace.
+[32m+[m[41m           [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/DashboardService.cs:99: trailing whitespace.
+[32m+[m[41m           [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/DashboardService.cs:147: trailing whitespace.
+[32m+[m[41m        [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/FileStorageService.cs:74: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/LiteratureReviewService.cs:80: trailing whitespace.
+[32m+[m[32m        var chunks = ChunkText(parseResult.ExtractedText, 2000);[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/LiteratureReviewService.cs:235: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/LiteratureReviewService.cs:391: trailing whitespace.
+[32m+[m[41m    [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/LiteratureReviewService.cs:459: trailing whitespace.
+[32m+[m[32m//[m[41m [m
+backend/src/TechGalaxySolutions.ResearchHub.Infrastructure/Services/NotificationService.cs:68: trailing whitespace.
+[32m+[m[41m    [m
+frontend/ResearchHubAI-refactored/src/pages/guide/GuideAssignedStudents.tsx:88: trailing whitespace.
+[32m+[m[41m              [m
+frontend/ResearchHubAI-refactored/src/pages/guide/GuideAssignedStudents.tsx:89: trailing whitespace.
+[32m+[m[41m              [m
+frontend/ResearchHubAI-refactored/src/pages/guide/GuideAssignedStudents.tsx:103: trailing whitespace.
+[32m+[m[41m    [m
+frontend/ResearchHubAI-refactored/src/pages/guide/GuideAssignedStudents.tsx:290: new blank line at EOF.
+frontend/ResearchHubAI-refactored/src/pages/guide/GuideThesisReviews.tsx:399: trailing whitespace.
+[32m+[m[41m      [m
+frontend/ResearchHubAI-refactored/src/pages/student/StudentChapterVersions.tsx:65: trailing whitespace.
+[32m+[m[41m  [m
+frontend/ResearchHubAI-refactored/src/pages/student/StudentResearchTimeline.tsx:272: trailing whitespace.
+[32m+[m[41m    [m
+frontend/ResearchHubAI-refactored/src/pages/student/StudentResearchTimeline.tsx:441: trailing whitespace.
+[32m+[m[32m                         )}[m[41m  [m
+frontend/ResearchHubAI-refactored/src/services/GuideService.ts:71: trailing whitespace.
+[32m+[m[41m  [m

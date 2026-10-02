@@ -32,4 +32,19 @@ public class StudentProfileController : ControllerBase
         var profile = await _studentProfileService.UpdateProfileAsync(userId, request);
         return Ok(profile);
     }
+
+    [HttpPost("photo")]
+[Consumes("multipart/form-data")]
+public async Task<IActionResult> UploadProfilePicture(
+    IFormFile file)
+{
+    var userId = User.GetUserId();
+
+    var profile =
+        await _studentProfileService.UploadProfilePictureAsync(
+            userId,
+            file);
+
+    return Ok(profile);
+}   
 }

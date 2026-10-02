@@ -65,6 +65,38 @@ public class NotificationService : INotificationService
 
         return _mapper.Map<NotificationResponse>(notification);
     }
+    
+
+public async Task<NotificationResponse> SendToUserAsync(
+    Guid recipientId,
+    string title,
+    string message,
+    string type)
+{
+    var userExists = await _context.Users
+        .AnyAsync(u => u.Id == recipientId && !u.IsDeleted);
+
+    if (!userExists)
+    {
+        throw new Exception(
+            $"Recipient user not found in EF: {recipientId}");
+    }
+
+    var notification = new Domain.Entities.Notification
+    {
+        UserId = recipientId,
+        Title = title,
+        Message = message,
+        Type = type,
+        IsRead = false
+    };
+
+    _context.Notifications.Add(notification);
+    await _context.SaveChangesAsync();
+
+    return _mapper.Map<NotificationResponse>(notification);
+}
+
 
     public async Task MarkAsReadAsync(Guid userId, MarkReadRequest request)
     {

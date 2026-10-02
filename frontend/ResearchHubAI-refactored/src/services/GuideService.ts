@@ -4,6 +4,7 @@ import {
   GuideDashboardData,
   Review,
   Chapter,
+  ChapterVersion,
   ChapterComment,
   Meeting,
   ApprovalHistoryEntry,
@@ -12,6 +13,7 @@ import {
 } from "../types/Guide";
 import type { AppNotification } from "../types/Student";
 import type { PagedResponse } from "../types/Pagination";
+
 
 export class GuideService {
   // Profile
@@ -66,6 +68,22 @@ export class GuideService {
     if (!res.success || !res.data) throw new Error(res.message || "Failed to get chapters");
     return res.data;
   }
+  
+  async getChapterVersions(
+  projectId: string,
+  chapterId: string
+): Promise<ChapterVersion[]> {
+  const res = await apiClient.get<ChapterVersion[]>(
+    `/projects/${projectId}/chapters/${chapterId}/versions`
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to get chapter versions");
+  }
+
+  return res.data;
+}
+
   async getChapter(projectId: string, chapterId: string): Promise<Chapter> {
     const res = await apiClient.get<Chapter>(`/projects/${projectId}/chapters/${chapterId}`);
     if (!res.success || !res.data) throw new Error(res.message || "Failed to get chapter");
@@ -145,6 +163,30 @@ export class GuideService {
     if (!res.success || !res.data) throw new Error(res.message || "Failed to get notifications");
     return Array.isArray(res.data) ? res.data : res.data.items;
   }
+
+  async sendNotification(
+  recipientId: string,
+  title: string,
+  message: string,
+  type: string
+): Promise<AppNotification> {
+  const res = await apiClient.post<AppNotification>(
+    "/notifications/send",
+    {
+      recipientId,
+      title,
+      message,
+      type
+    }
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to send notification");
+  }
+
+  return res.data;
+}
+
   async getUnreadCount(): Promise<number> {
     const res = await apiClient.get<{ count: number }>("/notifications/unread-count");
     if (!res.success || !res.data) throw new Error(res.message || "Failed to get unread count");
@@ -158,6 +200,19 @@ export class GuideService {
     const res = await apiClient.put("/notifications/mark-all-read", {});
     if (!res.success) throw new Error(res.message || "Failed to mark all as read");
   }
+
+
+async downloadChapterVersion(
+  projectId: string,
+  chapterId: string,
+  versionId: string
+) {
+  return await apiClient.downloadBlob(
+    `/projects/${projectId}/chapters/${chapterId}/versions/${versionId}/download`
+  );
+}
+
+
 }
 
 export const guideService = new GuideService();

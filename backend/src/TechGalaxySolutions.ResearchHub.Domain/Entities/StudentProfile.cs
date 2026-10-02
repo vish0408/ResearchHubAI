@@ -14,6 +14,8 @@ public class StudentProfile : BaseEntity
 
     public string? ResearchTopic { get; set; }
 
+    public string? ProfilePictureUrl { get; set; }
+
     public Guid? GuideId { get; set; }
 
     public User? Guide { get; set; }

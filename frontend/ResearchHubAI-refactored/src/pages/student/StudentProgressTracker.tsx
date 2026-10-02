@@ -108,7 +108,7 @@ export default function StudentProgressTracker() {
         </Card>
       </div>
 
-      <Card>
+      {/* <Card>
         <SectionHead title="Coursework Summary"/>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
@@ -128,7 +128,34 @@ export default function StudentProgressTracker() {
             <p className="text-sm font-bold text-foreground mt-0.5">{data?.passedPapers ?? 0} passed · {data?.pendingPapers ?? 0} pending</p>
           </div>
         </div>
-      </Card>
+      </Card> */}
+
+      <Card>
+  <SectionHead title="Coursework Summary" />
+
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <p className="text-xs text-muted-foreground">Status</p>
+      <p className="text-sm font-bold text-foreground mt-0.5">
+        {data?.courseworkStatus || "Not started"}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-xs text-muted-foreground">Credits Earned</p>
+      <p className="text-sm font-bold text-foreground mt-0.5">
+        {data?.earnedCredits ?? 0} / {data?.requiredCredits ?? 0}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-xs text-muted-foreground">Papers</p>
+      <p className="text-sm font-bold text-foreground mt-0.5">
+        {data?.passedPapers ?? 0} passed · {data?.pendingPapers ?? 0} pending
+      </p>
+    </div>
+  </div>
+</Card>
     </div>
   );
 }

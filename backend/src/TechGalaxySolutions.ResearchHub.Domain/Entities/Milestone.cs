@@ -13,4 +13,6 @@ public class Milestone : BaseEntity
     public DateTime TargetDate { get; set; }
 
     public bool IsCompleted { get; set; }
+
+    public ICollection<TaskItem> Tasks { get; set; } = new List<TaskItem>();
 }

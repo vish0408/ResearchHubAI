@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   CheckCircle,
   Clock,
+  Eye,
   RefreshCw,
   Search,
   Send,
@@ -10,16 +11,35 @@ import {
 import Badge from "../../components/common/Badge";
 import Card from "../../components/common/Card";
 import { guideService } from "../../services/GuideService";
-import { GuideDashboardData, AssignedStudentSummary, Chapter } from "../../types/Guide";
+import {
+  GuideDashboardData,
+  AssignedStudentSummary,
+  Chapter,
+  ChapterVersion
+} from "../../types/Guide";
 
 export default function GuideThesisReviews() {
   const [dashboard, setDashboard] = useState<GuideDashboardData | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [activeStudentIdx, setActiveStudentIdx] = useState(0);
-  const [activeChapterIdx, setActiveChapterIdx] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [comment, setComment] = useState("");
-  const [sending, setSending] = useState(false);
+
+const [chapters, setChapters] = useState<Chapter[]>([]);
+
+const [activeStudentIdx, setActiveStudentIdx] = useState(0);
+
+const [activeChapterIdx, setActiveChapterIdx] = useState(0);
+
+const [loading, setLoading] = useState(true);
+
+const [comment, setComment] = useState("");
+
+const [sending, setSending] = useState(false);
+
+const [error, setError] = useState("");
+
+const [versions, setVersions] = useState<ChapterVersion[]>([]);
+
+const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+const [previewFileName, setPreviewFileName] = useState("");
+
 
   const fetchDashboard = async () => {
     try {
@@ -33,20 +53,36 @@ export default function GuideThesisReviews() {
   };
 
   const fetchChapters = async (student: AssignedStudentSummary) => {
-    try {
-      const projectId = student.projectId;
-      if (projectId) {
-        const ch = await guideService.getProjectChapters(projectId);
-        setChapters(ch);
-        setActiveChapterIdx(0);
+  try {
+    const projectId = student.projectId;
+
+    if (projectId) {
+      const ch = await guideService.getProjectChapters(projectId);
+
+      setChapters(ch);
+      setActiveChapterIdx(0);
+
+      // Fetch versions for the first chapter
+      if (ch.length > 0) {
+        const v = await guideService.getChapterVersions(
+          projectId,
+          ch[0].id
+        );
+
+        setVersions(v);
       } else {
-        setChapters([]);
+        setVersions([]);
       }
-    } catch (e) {
-      console.error("Failed to load chapters", e);
+    } else {
       setChapters([]);
+      setVersions([]);
     }
-  };
+  } catch (e) {
+    console.error("Failed to load chapters", e);
+    setChapters([]);
+    setVersions([]);
+  }
+};
 
   useEffect(() => {
     (async () => {
@@ -64,6 +100,30 @@ export default function GuideThesisReviews() {
     await fetchChapters(student);
     setLoading(false);
   };
+
+  const handleChapterClick = async (idx: number) => {
+  setActiveChapterIdx(idx);
+
+  const chapter = chapters[idx];
+  const student = students[activeStudentIdx];
+
+  if (!chapter || !student?.projectId) {
+    setVersions([]);
+    return;
+  }
+
+  try {
+    const v = await guideService.getChapterVersions(
+      student.projectId,
+      chapter.id
+    );
+
+    setVersions(v);
+  } catch (e) {
+    console.error("Failed to load chapter versions", e);
+    setVersions([]);
+  }
+};
 
   const handleStatusUpdate = async (chapterId: string, status: string) => {
     try {
@@ -90,6 +150,35 @@ export default function GuideThesisReviews() {
     }
   };
 
+ const handlePreviewVersion = async (version: ChapterVersion) => {
+  const student = students[activeStudentIdx];
+
+  if (!student?.projectId || !activeChapter) {
+    return;
+  }
+
+  try {
+    setError("");
+
+    const result = await guideService.downloadChapterVersion(
+      student.projectId,
+      activeChapter.id,
+      version.id
+    );
+
+    const url = URL.createObjectURL(result.data);
+
+    setPreviewUrl(url);
+    setPreviewFileName(result.fileName || version.fileName || "Document");
+  } catch (e: unknown) {
+    setError(
+      e instanceof Error
+        ? e.message
+        : "Failed to preview chapter version"
+    );
+  }
+};
+
   const students = dashboard?.assignedStudents ?? [];
   const activeChapter = chapters[activeChapterIdx];
   const projectTitle = students[activeStudentIdx]?.projectTitle || "Project";
@@ -103,6 +192,52 @@ export default function GuideThesisReviews() {
   }
 
   return (
+    <>
+  {error && (
+    <div className="fixed top-20 right-5 z-50 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 shadow-lg">
+      {error}
+    </div>
+  )}
+
+  {previewUrl && (
+  <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-6">
+    <div className="w-full max-w-6xl h-[90vh] bg-background rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <div>
+          <p className="text-sm font-bold text-foreground">
+            Chapter Preview
+          </p>
+          <p className="text-xs text-muted-foreground truncate max-w-xl">
+            {previewFileName}
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+            setPreviewFileName("");
+          }}
+          className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center"
+          title="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 bg-muted">
+        <iframe
+          src={previewUrl}
+          className="w-full h-full border-0"
+          title="Chapter Preview"
+        />
+      </div>
+
+    </div>
+  </div>
+)}
+
     <div className="flex gap-5 h-[calc(100vh-9rem)]">
       <div className="w-72 flex-shrink-0 flex flex-col gap-2">
         <div className="relative mb-2"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground"/><input className="w-full bg-muted border border-border rounded-xl pl-9 pr-3 py-2 text-sm outline-none focus:border-primary" placeholder="Search reviews…"/></div>
@@ -119,7 +254,7 @@ export default function GuideThesisReviews() {
         {chapters.length > 0 && (
           <div className="flex gap-2 flex-wrap">
             {chapters.map((ch,i)=>(
-              <button key={ch.id} onClick={()=>setActiveChapterIdx(i)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${activeChapterIdx===i?"border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300":"border-border text-muted-foreground hover:bg-muted"}`}>
+              <button key={ch.id} onClick={() => handleChapterClick(i)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${activeChapterIdx===i?"border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300":"border-border text-muted-foreground hover:bg-muted"}`}>
                 {ch.title}
               </button>
             ))}
@@ -134,11 +269,100 @@ export default function GuideThesisReviews() {
                 <p className="text-xs text-muted-foreground">{projectTitle}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={activeChapter.status?.toLowerCase()==="approved"?"success":activeChapter.status?.toLowerCase()==="submitted"?"warning":activeChapter.status?.toLowerCase()==="revisionrequired"?"danger":"default"}>{activeChapter.status}</Badge>
+               <Badge
+  variant={
+    activeChapter.status?.toLowerCase() === "approved"
+      ? "success"
+      : activeChapter.status?.toLowerCase() === "revisionrequired"
+      ? "danger"
+      : activeChapter.status?.toLowerCase() === "submitted"
+      ? "warning"
+      : "default"
+  }
+>
+  {activeChapter.status?.toLowerCase() === "submitted"
+    ? "Pending"
+    : activeChapter.status}
+</Badge>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
               <div className="bg-muted/50 rounded-xl p-4 text-sm leading-relaxed text-muted-foreground border border-border whitespace-pre-wrap">{activeChapter.content}</div>
+
+      {versions.length > 0 && (
+  <div className="mt-5">
+    <p className="text-sm font-bold text-foreground mb-3">
+      Chapter Versions
+    </p>
+
+    <div className="flex flex-col gap-2">
+      {versions
+        .slice()
+        .sort((a, b) => b.versionNumber - a.versionNumber)
+        .map((version) => (
+          <div
+            key={version.id}
+            className="border border-border rounded-xl p-3 bg-background"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  Version {version.versionNumber}
+                </p>
+
+                {version.fileName ? (
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    📄 {version.fileName}
+                    {" • "}
+                    {version.fileType || "Unknown"}
+                    {version.fileSize
+                      ? ` • ${(version.fileSize / 1024 / 1024).toFixed(2)} MB`
+                      : ""}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Text version
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Badge
+                  variant={
+                    version.status?.toLowerCase() === "approved"
+                      ? "success"
+                      : version.status?.toLowerCase() === "revisionrequired"
+                      ? "danger"
+                      : "warning"
+                  }
+                >
+                  {version.status?.toLowerCase() === "submitted"
+                    ? "Pending"
+                    : version.status}
+                </Badge>
+{version.fileName && (
+  <button
+    onClick={() => handlePreviewVersion(version)}
+    className="w-8 h-8 rounded-lg border border-border hover:bg-muted flex items-center justify-center transition-colors"
+    title="Preview"
+  >
+    <Eye className="w-4 h-4 text-muted-foreground" />
+  </button>
+)}
+
+
+              </div>
+            </div>
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Created{" "}
+              {new Date(version.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+        ))}
+    </div>
+  </div>
+)}
               {activeChapter.comments.length > 0 && (
                 <div className="mt-4 flex flex-col gap-2">
                   <p className="text-xs font-bold text-muted-foreground">Comments ({activeChapter.comments.length})</p>
@@ -172,6 +396,9 @@ export default function GuideThesisReviews() {
           </div>
         )}
       </div>
+      
     </div>
+
+     </>
   );
 }

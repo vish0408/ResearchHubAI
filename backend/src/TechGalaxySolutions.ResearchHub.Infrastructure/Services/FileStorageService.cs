@@ -67,7 +67,11 @@ public class FileStorageService : IFileStorageService
 
     public async Task<byte[]?> ReadFileAsync(string filePath)
     {
-        var fullPath = Path.Combine(_basePath, filePath);
+       var fullPath = Path.Combine(_basePath, filePath);
+
+_logger.LogWarning("DOWNLOAD DEBUG => BasePath: {BasePath} | FilePath: {FilePath} | FullPath: {FullPath} | Exists: {Exists}",
+    _basePath, filePath, fullPath, File.Exists(fullPath));
+    
         if (!File.Exists(fullPath))
         {
             _logger.LogWarning("File not found: {Path}", fullPath);

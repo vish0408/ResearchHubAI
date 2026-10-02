@@ -455,6 +455,18 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FileName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FilePath")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileType")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -2346,6 +2358,9 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<string>("PhdMode")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("RegistrationDate")
                         .HasColumnType("datetime2");
 
@@ -2452,6 +2467,9 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<Guid?>("MilestoneId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
@@ -2471,6 +2489,8 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedToId");
+
+                    b.HasIndex("MilestoneId");
 
                     b.HasIndex("ProjectId")
                         .HasDatabaseName("IX_TaskItems_ProjectId");
@@ -3387,6 +3407,11 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .HasForeignKey("AssignedToId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.Milestone", "Milestone")
+                        .WithMany("Tasks")
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.Project", "Project")
                         .WithMany("Tasks")
                         .HasForeignKey("ProjectId")
@@ -3394,6 +3419,8 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("AssignedTo");
+
+                    b.Navigation("Milestone");
 
                     b.Navigation("Project");
                 });
@@ -3491,6 +3518,11 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.Meeting", b =>
                 {
                     b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.Milestone", b =>
+                {
+                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.Project", b =>
