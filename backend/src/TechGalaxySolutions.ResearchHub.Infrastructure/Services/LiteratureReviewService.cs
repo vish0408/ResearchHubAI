@@ -142,6 +142,290 @@ Format with clear section headers using ### markers.";
         return MapDocument(doc);
     }
 
+public async Task<LiteratureReviewResponse> AnalyzeLiteratureReviewAsync(
+    Guid userId,
+    AnalyzeLiteratureReviewRequest request)
+{
+    var review = await _context.Set<LiteratureReview>()
+        .Include(l => l.Documents)
+        .FirstOrDefaultAsync(l =>
+            l.Id == request.LiteratureReviewId &&
+            l.StudentId == userId &&
+            !l.IsDeleted);
+
+    if (review is null)
+        throw new KeyNotFoundException("Literature review not found");
+
+    var docs = review.Documents
+        .Where(d => !d.IsDeleted)
+        .OrderBy(d => d.CreatedAt)
+        .ToList();
+
+    if (docs.Count == 0)
+    {
+        throw new InvalidOperationException(
+            "No literature documents were found for this review.");
+    }
+
+    var provider = _providerFactory.GetDefaultProvider();
+
+    /*
+     * IMPORTANT:
+     * Give every paper its own context budget.
+     *
+     * This prevents the first few papers from consuming the
+     * entire prompt and causing later papers to disappear.
+     */
+    const int perPaperContextLimit = 2200;
+
+    var paperContexts = new List<string>();
+
+    for (var i = 0; i < docs.Count; i++)
+    {
+        var doc = docs[i];
+
+        var evidence = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(doc.Title))
+        {
+            evidence.Add($"TITLE: {doc.Title}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.Authors))
+        {
+            evidence.Add($"AUTHORS: {doc.Authors}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.Abstract))
+        {
+            evidence.Add($"ABSTRACT: {doc.Abstract}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.Summary))
+        {
+            evidence.Add($"SUMMARY: {doc.Summary}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.ResearchContributions))
+        {
+            evidence.Add(
+                $"RESEARCH CONTRIBUTIONS: {doc.ResearchContributions}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.MethodologySummary))
+        {
+            evidence.Add(
+                $"METHODOLOGY: {doc.MethodologySummary}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.Strengths))
+        {
+            evidence.Add($"STRENGTHS: {doc.Strengths}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.Weaknesses))
+        {
+            evidence.Add($"WEAKNESSES: {doc.Weaknesses}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.Limitations))
+        {
+            evidence.Add($"LIMITATIONS: {doc.Limitations}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(doc.FutureWork))
+        {
+            evidence.Add($"FUTURE WORK: {doc.FutureWork}");
+        }
+
+        /*
+         * If individual AI analysis has not been performed,
+         * use the paper's extracted content as fallback.
+         */
+        var hasAnalysisData =
+            !string.IsNullOrWhiteSpace(doc.Summary) ||
+            !string.IsNullOrWhiteSpace(doc.ResearchContributions) ||
+            !string.IsNullOrWhiteSpace(doc.MethodologySummary) ||
+            !string.IsNullOrWhiteSpace(doc.Strengths) ||
+            !string.IsNullOrWhiteSpace(doc.Weaknesses) ||
+            !string.IsNullOrWhiteSpace(doc.Limitations) ||
+            !string.IsNullOrWhiteSpace(doc.FutureWork);
+
+        if (!hasAnalysisData &&
+            !string.IsNullOrWhiteSpace(doc.ExtractedText))
+        {
+            evidence.Add(
+                $"PAPER CONTENT: {doc.ExtractedText}");
+        }
+
+        var paperEvidence = string.Join("\n", evidence);
+
+        /*
+         * Every paper gets its own limit.
+         * Therefore 10 papers still contribute to the review.
+         */
+        if (paperEvidence.Length > perPaperContextLimit)
+        {
+            paperEvidence =
+                paperEvidence[..perPaperContextLimit] +
+                "\n[Paper context truncated for prompt size.]";
+        }
+
+        paperContexts.Add(
+            $"===== PAPER {i + 1} =====\n" +
+            paperEvidence);
+    }
+
+    var literatureContext = string.Join(
+        "\n\n",
+        paperContexts);
+
+    _logger.LogInformation(
+        "Starting overall literature analysis. " +
+        "ReviewId: {ReviewId}, Documents: {DocumentCount}, " +
+        "ContextLength: {ContextLength}",
+        review.Id,
+        docs.Count,
+        literatureContext.Length);
+
+    var prompt = $"""
+        You are an expert academic literature review researcher.
+
+        Research area:
+        {request.ResearchArea}
+
+        You are analyzing a collection of {docs.Count} research papers
+        as ONE literature review.
+
+        IMPORTANT INSTRUCTIONS:
+
+        - Consider EVERY paper listed below.
+        - Do not ignore later papers.
+        - Do not analyze only the first few papers.
+        - Treat each PAPER section as a separate research source.
+        - Synthesize information across the complete collection.
+        - Identify similarities and differences between papers.
+        - Identify recurring research themes.
+        - Compare methodologies and approaches.
+        - Compare findings where information is available.
+        - Identify the evolution of research where publication
+          information supports such a conclusion.
+        - Do not invent information.
+        - If information is not available, explicitly state that
+          it is not available.
+        - Do not create unsupported citations or authors.
+        - Do not treat this as a collection of independent
+          paper summaries.
+        - Produce an integrated academic literature review.
+
+        Provide the following sections.
+
+        ### EXECUTIVE SUMMARY
+
+        Give a concise synthesis of the overall research landscape,
+        major themes, approaches, and findings across ALL papers.
+
+        ### KEY THEMES
+
+        Identify the major research themes, techniques,
+        approaches, or research directions appearing across
+        the papers.
+
+        ### METHODOLOGY OVERVIEW
+
+        Compare the methodologies, techniques, datasets,
+        tools, algorithms, or experimental approaches used
+        across the papers.
+
+        ### KEY FINDINGS
+
+        Synthesize the most important findings across the papers.
+        Highlight areas where findings agree, differ, or
+        complement one another.
+
+        ### RESEARCH EVOLUTION
+
+        Explain how the research approaches, techniques,
+        or findings develop across the literature when the
+        provided information supports this.
+
+        ### OVERALL LIMITATIONS
+
+        Identify recurring limitations, weaknesses,
+        unresolved issues, and methodological limitations
+        across the papers.
+
+        ### FUTURE RESEARCH DIRECTIONS
+
+        Synthesize future research directions suggested by
+        the papers and identify broader directions supported
+        by the literature.
+
+        ### MAIN CONCLUSION
+
+        Provide an overall academic conclusion based only
+        on the provided literature.
+
+        LITERATURE COLLECTION:
+
+        {literatureContext}
+
+        Return the answer using the exact ### section
+        headers requested above.
+        """;
+
+    var aiRequest = new AIRequest
+    {
+        Messages = new()
+        {
+            new()
+            {
+                Role = "user",
+                Content = prompt
+            }
+        },
+        Options = new()
+        {
+            Temperature = 0.4,
+            MaxTokens = 5000
+        }
+    };
+
+    _logger.LogInformation(
+        "Sending overall literature review analysis to AI. " +
+        "ReviewId: {ReviewId}, Papers: {DocumentCount}",
+        review.Id,
+        docs.Count);
+
+    var response = await provider.SendAsync(aiRequest);
+
+    if (string.IsNullOrWhiteSpace(response.Content))
+    {
+        throw new InvalidOperationException(
+            "The AI provider returned an empty literature review analysis.");
+    }
+
+    /*
+     * Store the complete AI synthesis as the review-level
+     * ExecutiveSummary.
+     */
+    review.ExecutiveSummary = CleanSummary(response.Content);
+
+    review.Status = "Analyzed";
+    review.UpdatedAt = DateTime.UtcNow;
+
+    await SaveAnalysisHistory(
+        review.Id,
+        "LiteratureReview",
+        literatureContext,
+        response.Content,
+        provider.ProviderType.ToString());
+
+    await _context.SaveChangesAsync();
+
+    return MapReview(review);
+}
+
    public async Task<UploadedDocumentResponse> SummarizeDocumentAsync(
     Guid userId,
     SummarizeRequest request)

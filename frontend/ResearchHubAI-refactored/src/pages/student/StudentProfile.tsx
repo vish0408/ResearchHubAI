@@ -180,20 +180,22 @@ export default function StudentProfile() {
   const { setScreen } = useApp();
 
   const [profile, setProfile] = useState<StudentProfileDto | null>(null);
-  const [loading, setLoading] = useState(true);
+const [loading, setLoading] = useState(true);
+const [photoVersion, setPhotoVersion] = useState(Date.now());
+ useEffect(() => {
+  studentService
+    .getProfile()
+    .then((data) => {
+      console.log("PROFILE DATA:", data);
 
-  useEffect(() => {
-    studentService
-      .getProfile()
-      .then((data) => {
-        console.log("PROFILE DATA:", data);
-        setProfile(data);
-      })
-      .catch((error) => {
-        console.error("PROFILE ERROR:", error);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+      setProfile(data);
+      setPhotoVersion(Date.now());
+    })
+    .catch((error) => {
+      console.error("PROFILE ERROR:", error);
+    })
+    .finally(() => setLoading(false));
+}, []);
 
   if (loading) {
     return (
@@ -215,11 +217,11 @@ export default function StudentProfile() {
     );
   }
 
-  const profileImageUrl = profile.profilePictureUrl
-    ? profile.profilePictureUrl.startsWith("http")
-      ? profile.profilePictureUrl
-      : `http://localhost:5168/uploads/${profile.profilePictureUrl}`
-    : null;
+ const profileImageUrl = profile.profilePictureUrl
+  ? profile.profilePictureUrl.startsWith("http")
+    ? `${profile.profilePictureUrl}?v=${photoVersion}`
+    : `http://localhost:5168/uploads/${profile.profilePictureUrl}?v=${photoVersion}`
+  : null;
 
   console.log("PROFILE IMAGE URL:", profileImageUrl);
 

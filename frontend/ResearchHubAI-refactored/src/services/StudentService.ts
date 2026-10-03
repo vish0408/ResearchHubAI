@@ -55,6 +55,21 @@ async uploadProfilePicture(
   return res.data;
 }
 
+async markChapterFeedbackThreadAsRead(
+  chapterId: string,
+  threadId: string
+): Promise<void> {
+  const res = await apiClient.patch(
+    `/chapters/${chapterId}/comments/thread/${threadId}/read`
+  );
+
+  if (!res.success) {
+    throw new Error(
+      res.message || "Failed to mark feedback as read"
+    );
+  }
+}
+
   // Dashboard
   async getDashboard(): Promise<DashboardData> {
     const res = await apiClient.get<DashboardData>("/dashboard/student");
@@ -273,18 +288,35 @@ async createChapterVersion(
 //   return res.data;
 // }
 
-  async addChapterComment(chapterId: string, data: { content: string; lineNumber?: number }): Promise<void> {
-    const res = await apiClient.post(`/chapters/${chapterId}/comments`, data);
-    if (!res.success) throw new Error(res.message || "Failed to add comment");
+async addChapterComment(
+  chapterId: string,
+  data: {
+    content: string;
+    lineNumber?: number;
+    parentCommentId?: string | null;
+    feedbackThreadId?: string | null;
+  }
+): Promise<void> {
+  const res = await apiClient.post(
+    `/chapters/${chapterId}/comments`,
+    data
+  );
+
+  if (!res.success) {
+    throw new Error(res.message || "Failed to add comment");
+  }
+}
+
+// Meetings
+async getMyMeetings(): Promise<Meeting[]> {
+  const res = await apiClient.get<PagedResponse<Meeting>>("/meetings");
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to get meetings");
   }
 
-  // Meetings
-  async getMyMeetings(): Promise<Meeting[]> {
-    const res = await apiClient.get<PagedResponse<Meeting>>("/meetings");
-    if (!res.success || !res.data) throw new Error(res.message || "Failed to get meetings");
-    return res.data.items;
-  }
-
+  return res.data.items;
+}
   async createMeeting(data: {
     title: string;
     description?: string;

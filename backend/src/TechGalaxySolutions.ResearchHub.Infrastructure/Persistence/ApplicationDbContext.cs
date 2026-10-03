@@ -201,12 +201,32 @@ entity.HasOne(t => t.Milestone)
         .HasDatabaseName("IX_ChapterVersions_ChapterId_VersionNumber");
 });
 
-        modelBuilder.Entity<ChapterComment>(entity =>
-        {
-            entity.HasOne(c => c.Chapter).WithMany(c => c.Comments).HasForeignKey(c => c.ChapterId);
-            entity.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.NoAction);
-            entity.HasIndex(cc => cc.ChapterId).HasDatabaseName("IX_ChapterComments_ChapterId");
-        });
+    modelBuilder.Entity<ChapterComment>(entity =>
+{
+    entity.HasOne(c => c.Chapter)
+        .WithMany(c => c.Comments)
+        .HasForeignKey(c => c.ChapterId);
+
+    entity.HasOne(c => c.User)
+        .WithMany()
+        .HasForeignKey(c => c.UserId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+    entity.HasOne(c => c.ParentComment)
+        .WithMany(c => c.Replies)
+        .HasForeignKey(c => c.ParentCommentId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+    entity.HasIndex(cc => cc.ChapterId)
+        .HasDatabaseName("IX_ChapterComments_ChapterId");
+
+    entity.HasIndex(cc => cc.ParentCommentId)
+        .HasDatabaseName("IX_ChapterComments_ParentCommentId");
+
+    entity.HasIndex(cc => cc.FeedbackThreadId)
+        .HasDatabaseName("IX_ChapterComments_FeedbackThreadId");
+});
+
 
         modelBuilder.Entity<Meeting>(entity =>
         {

@@ -19,6 +19,7 @@ export interface BackendCurrentUser {
   departmentId?: string;
   departmentName?: string;
   designation?: string;
+  profilePictureUrl?: string;
 }
 
 export interface TokenValidationResult {
@@ -139,6 +140,7 @@ export class AuthService {
         .join("")
         .toUpperCase()
         .slice(0, 2),
+        profilePictureUrl: backendUser.profilePictureUrl,
       designation: backendUser.designation,
       collegeId: backendUser.collegeId,
       collegeName: backendUser.collegeName,

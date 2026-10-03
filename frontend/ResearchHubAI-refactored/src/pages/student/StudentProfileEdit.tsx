@@ -371,15 +371,16 @@ import SectionHead from "../../components/common/SectionHead";
 import { useApp } from "../../context/AppContext";
 import { studentService } from "../../services/StudentService";
 import { StudentProfileDto } from "../../types/Student";
-
+import { authService } from "../../services/AuthService";
 export default function StudentProfileEdit() {
-  const { setScreen } = useApp();
+ const { setScreen, updateUser } = useApp();
 
   const [profile, setProfile] = useState<StudentProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState("");
+  const [photoVersion, setPhotoVersion] = useState(Date.now());
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -455,10 +456,14 @@ export default function StudentProfileEdit() {
       setUploadingPhoto(true);
       setError("");
 
-      const updatedProfile =
-        await studentService.uploadProfilePicture(file);
+     const updatedProfile =
+  await studentService.uploadProfilePicture(file);
 
-      setProfile(updatedProfile);
+setProfile(updatedProfile);
+setPhotoVersion(Date.now());
+
+const updatedUser = await authService.getCurrentUser();
+updateUser(updatedUser);
     } catch (err) {
       setError(
         err instanceof Error
@@ -491,6 +496,8 @@ export default function StudentProfileEdit() {
           institution: profile.institution,
           researchTopic: profile.researchTopic,
         });
+        const updatedUser = await authService.getCurrentUser();
+updateUser(updatedUser);
 
       setProfile(updatedProfile);
 
@@ -557,15 +564,15 @@ export default function StudentProfileEdit() {
               <div className="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-bold text-white shadow-sm">
 
                 {profile.profilePictureUrl ? (
-                  <img
-                    src={
-                      profile.profilePictureUrl.startsWith("http")
-                        ? profile.profilePictureUrl
-                        : `http://localhost:5168/uploads/${profile.profilePictureUrl}`
-                    }
-                    alt={profile.fullName || "Student"}
-                    className="w-full h-full object-cover"
-                  />
+                <img
+  src={
+    profile.profilePictureUrl.startsWith("http")
+      ? `${profile.profilePictureUrl}?v=${photoVersion}`
+      : `http://localhost:5168/uploads/${profile.profilePictureUrl}?v=${photoVersion}`
+  }
+  alt={profile.fullName || "Student"}
+  className="w-full h-full object-cover"
+/>
                 ) : (
                   profile.fullName
                     ?.charAt(0)

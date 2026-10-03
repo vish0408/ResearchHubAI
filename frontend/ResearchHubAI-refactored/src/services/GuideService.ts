@@ -101,11 +101,42 @@ export class GuideService {
     if (!res.success || !res.data) throw new Error(res.message || "Failed to get comments");
     return res.data;
   }
-  async addChapterComment(chapterId: string, data: { content: string; lineNumber?: number }): Promise<ChapterComment> {
-    const res = await apiClient.post<ChapterComment>(`/chapters/${chapterId}/comments`, data);
-    if (!res.success || !res.data) throw new Error(res.message || "Failed to add comment");
-    return res.data;
+  async resolveChapterComment(
+  chapterId: string,
+  commentId: string
+): Promise<ChapterComment> {
+  const res = await apiClient.patch<ChapterComment>(
+    `/chapters/${chapterId}/comments/${commentId}/resolve`
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || "Failed to resolve comment");
   }
+
+  return res.data;
+}
+ async addChapterComment(
+  chapterId: string,
+  data: {
+    content: string;
+    lineNumber?: number;
+    parentCommentId?: string | null;
+    feedbackThreadId?: string | null;
+  }
+): Promise<ChapterComment> {
+  const res = await apiClient.post<ChapterComment>(
+    `/chapters/${chapterId}/comments`,
+    data
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to add comment"
+    );
+  }
+
+  return res.data;
+}
   async deleteChapterComment(chapterId: string, commentId: string): Promise<void> {
     const res = await apiClient.delete(`/chapters/${chapterId}/comments/${commentId}`);
     if (!res.success) throw new Error(res.message || "Failed to delete comment");
@@ -144,6 +175,7 @@ export class GuideService {
     const res = await apiClient.delete(`/meetings/${id}`);
     if (!res.success) throw new Error(res.message || "Failed to delete meeting");
   }
+  
 
   // Approval History
   async getProjectHistory(projectId: string): Promise<ApprovalHistoryEntry[]> {

@@ -171,6 +171,26 @@ class ApiClient {
     });
   }
 
+  async patch<T>(path: string, body?: unknown): Promise<ApiResponse<T>> {
+    return this.autoRetryOnExpiry(async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+          method: "PATCH",
+          headers: this.getHeaders(),
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+
+        return this.handleResponse<T>(response);
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
+  }
+
   async delete<T>(path: string): Promise<ApiResponse<T>> {
     return this.autoRetryOnExpiry(async () => {
       const controller = new AbortController();

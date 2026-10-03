@@ -18,6 +18,13 @@ public class AnalyzeDocumentRequest
     public string ResearchArea { get; set; } = string.Empty;
 }
 
+public class AnalyzeLiteratureReviewRequest
+{
+    public Guid LiteratureReviewId { get; set; }
+
+    public string ResearchArea { get; set; } = string.Empty;
+}
+
 public class SummarizeRequest
 {
     public Guid DocumentId { get; set; }

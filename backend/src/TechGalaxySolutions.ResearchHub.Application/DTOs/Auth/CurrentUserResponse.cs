@@ -15,4 +15,5 @@ public class CurrentUserResponse
     public string? DepartmentId { get; set; }
     public string? CollegeName { get; set; }
     public string? DepartmentName { get; set; }
+    public string? ProfilePictureUrl { get; set; }
 }

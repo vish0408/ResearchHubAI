@@ -10,6 +10,13 @@ export interface AnalyzeDocumentRequest {
   researchArea: string;
 }
 
+// Overall literature review analysis
+// Analyzes all papers belonging to one LiteratureReview
+export interface AnalyzeLiteratureReviewRequest {
+  literatureReviewId: string;
+  researchArea: string;
+}
+
 export interface SummarizeRequest {
   documentId: string;
 }
@@ -74,8 +81,18 @@ export interface LiteratureReviewResponse {
 }
 
 export const RESEARCH_AREAS = [
-  "Computer Science", "Engineering", "Medical", "Biology",
-  "Physics", "Chemistry", "Mathematics", "Economics",
-  "Psychology", "Education", "Environmental Science",
-  "Materials Science", "Neuroscience", "Artificial Intelligence",
+  "Computer Science",
+  "Engineering",
+  "Medical",
+  "Biology",
+  "Physics",
+  "Chemistry",
+  "Mathematics",
+  "Economics",
+  "Psychology",
+  "Education",
+  "Environmental Science",
+  "Materials Science",
+  "Neuroscience",
+  "Artificial Intelligence",
 ];

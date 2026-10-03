@@ -35,3 +35,6 @@ Thumbs.db
 # IDE
 .idea/
 *.swp
+
+# Runtime uploaded files
+backend/src/TechGalaxySolutions.ResearchHub.Api/Uploads/
