@@ -36,20 +36,24 @@ import {
 } from "lucide-react";
 
 export const STUDENT_NAV = [
-  { id: "dashboard",        label: "Dashboard",         icon: LayoutDashboard, badge: null },
-  { id: "my-research",      label: "My Research",       icon: FlaskConical,    badge: null },
-  { id: "research-timeline",label: "Research Timeline", icon: GitBranch,       badge: null },
-  { id: "thesis-upload",    label: "Thesis Upload",     icon: Upload,          badge: null },
-  { id: "chapter-versions", label: "Chapter Versions",  icon: History,         badge: null },
-  { id: "ai-assistant",     label: "AI Assistant",      icon: Brain,           badge: "AI" },
-  { id: "proposal-generator", label: "Proposal Generator", icon: FileText,       badge: "AI" },
-  { id: "literature",       label: "Literature Review", icon: BookOpen,        badge: null },
-  { id: "meetings",         label: "Meeting Schedule",  icon: Calendar,        badge: "3"  },
-  { id: "guide-comments",   label: "Guide Comments",    icon: MessageCircle,   badge: "2"  },
-  { id: "progress",         label: "Progress Tracker",  icon: Target,          badge: null },
-  { id: "notifications",    label: "Notifications",     icon: Bell,            badge: "4"  },
-  { id: "profile",          label: "Profile",           icon: User,            badge: null },
-  { id: "settings",         label: "Settings",          icon: Settings,        badge: null },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null },
+  { id: "my-research", label: "My Research", icon: FlaskConical, badge: null },
+  { id: "research-timeline", label: "Research Timeline", icon: GitBranch, badge: null },
+  { id: "thesis-upload", label: "Thesis Upload", icon: Upload, badge: null },
+  { id: "chapter-versions", label: "Chapter Versions", icon: History, badge: null },
+
+  { id: "ai-assistant", label: "AI Assistant", icon: Brain, badge: "AI" },
+
+  { id: "proposal-generator", label: "Proposal Generator", icon: FileText, badge: "AI" },
+
+  { id: "literature", label: "Literature Review", icon: BookOpen, badge: "AI" },
+
+ { id: "meetings", label: "Meeting Schedule", icon: Calendar, badge: null },
+  { id: "guide-comments", label: "Guide Comments", icon: MessageCircle, badge: null },
+  { id: "progress", label: "Progress Tracker", icon: Target, badge: null },
+  { id: "notifications", label: "Notifications", icon: Bell, badge: null },
+  { id: "profile", label: "Profile", icon: User, badge: null },
+  { id: "settings", label: "Settings", icon: Settings, badge: null },
 ];
 
 export const GUIDE_NAV = [

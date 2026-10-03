@@ -26,6 +26,19 @@ public class LiteratureReviewController : ControllerBase
         return Ok(result);
     }
 
+
+    [HttpPost("analyze-review")]
+public async Task<IActionResult> AnalyzeReview(
+    [FromBody] AnalyzeLiteratureReviewRequest request)
+{
+    var userId = User.GetUserId();
+
+    var result = await _literatureService
+        .AnalyzeLiteratureReviewAsync(userId, request);
+
+    return Ok(result);
+}
+
     [HttpPost("analyze")]
     public async Task<IActionResult> Analyze([FromBody] AnalyzeDocumentRequest request)
     {

@@ -391,22 +391,31 @@ public class AuthService : IAuthService
         return await GenerateTokenResponseAsync(user);
     }
 
-    public async Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId)
+   public async Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId)
+{
+    var user = await _context.Users.AsNoTracking()
+        .Include(u => u.Role)
+        .Include(u => u.CollegeEntity)
+        .Include(u => u.DepartmentEntity)
+        .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
+
+    if (user == null)
     {
-        var user = await _context.Users.AsNoTracking()
-            .Include(u => u.Role)
-            .Include(u => u.CollegeEntity)
-            .Include(u => u.DepartmentEntity)
-            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
-
-        if (user == null)
-        {
-            throw new KeyNotFoundException("User not found");
-        }
-
-        return _mapper.Map<CurrentUserResponse>(user);
+        throw new KeyNotFoundException("User not found");
     }
 
+    var response = _mapper.Map<CurrentUserResponse>(user);
+
+    var profilePictureUrl = await _context.StudentProfiles
+        .AsNoTracking()
+        .Where(sp => sp.UserId == userId && !sp.IsDeleted)
+        .Select(sp => sp.ProfilePictureUrl)
+        .FirstOrDefaultAsync();
+
+    response.ProfilePictureUrl = profilePictureUrl;
+
+    return response;
+}
     public async Task LogoutAsync(Guid userId, string refreshToken)
     {
         var storedToken = await _context.RefreshTokens

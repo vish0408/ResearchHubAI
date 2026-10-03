@@ -33,6 +33,8 @@ const [comment, setComment] = useState("");
 
 const [sending, setSending] = useState(false);
 
+const [resolvingCommentId, setResolvingCommentId] = useState<string | null>(null);
+
 const [error, setError] = useState("");
 
 const [versions, setVersions] = useState<ChapterVersion[]>([]);
@@ -135,20 +137,108 @@ const [previewFileName, setPreviewFileName] = useState("");
     }
   };
 
+  // const handleAddComment = async (chapterId: string) => {
+  //   if (!comment.trim()) return;
+  //   setSending(true);
+  //   try {
+  //     await guideService.addChapterComment(chapterId, { content: comment.trim() });
+  //     setComment("");
+  //     const student = dashboard?.assignedStudents[activeStudentIdx];
+  //     if (student) await fetchChapters(student);
+  //   } catch (e) {
+  //     console.error("Failed to add comment", e);
+  //   } finally {
+  //     setSending(false);
+  //   }
+  // };
+
   const handleAddComment = async (chapterId: string) => {
-    if (!comment.trim()) return;
-    setSending(true);
-    try {
-      await guideService.addChapterComment(chapterId, { content: comment.trim() });
-      setComment("");
-      const student = dashboard?.assignedStudents[activeStudentIdx];
-      if (student) await fetchChapters(student);
-    } catch (e) {
-      console.error("Failed to add comment", e);
-    } finally {
-      setSending(false);
+  if (!comment.trim()) return;
+
+  setSending(true);
+  setError("");
+
+  try {
+    const currentChapter = chapters.find(
+      (chapter) => chapter.id === chapterId
+    );
+
+    if (!currentChapter) {
+      throw new Error("Chapter not found");
     }
-  };
+
+    // Find the latest unresolved feedback thread.
+    const existingFeedbackThread = (currentChapter.comments || [])
+      .filter(
+        (c) =>
+          !c.parentCommentId &&
+          c.feedbackThreadId &&
+          !c.isResolved
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
+      )[0];
+
+    await guideService.addChapterComment(chapterId, {
+      content: comment.trim(),
+      feedbackThreadId:
+        existingFeedbackThread?.feedbackThreadId ?? null,
+    });
+
+    setComment("");
+
+    const student =
+      dashboard?.assignedStudents[activeStudentIdx];
+
+    if (student) {
+      await fetchChapters(student);
+    }
+  } catch (e) {
+    console.error("Failed to add comment", e);
+
+    setError(
+      e instanceof Error
+        ? e.message
+        : "Failed to add comment"
+    );
+  } finally {
+    setSending(false);
+  }
+};
+
+  const handleResolveComment = async (
+  chapterId: string,
+  commentId: string
+) => {
+  setResolvingCommentId(commentId);
+
+  try {
+    await guideService.resolveChapterComment(
+      chapterId,
+      commentId
+    );
+
+    // Reload the current chapter so the updated
+    // IsResolved value comes from the database.
+    const student = dashboard?.assignedStudents[activeStudentIdx];
+
+    if (student) {
+      await fetchChapters(student);
+    }
+  } catch (e) {
+    console.error("Failed to resolve comment", e);
+
+    setError(
+      e instanceof Error
+        ? e.message
+        : "Failed to resolve comment"
+    );
+  } finally {
+    setResolvingCommentId(null);
+  }
+};
 
  const handlePreviewVersion = async (version: ChapterVersion) => {
   const student = students[activeStudentIdx];
@@ -182,6 +272,13 @@ const [previewFileName, setPreviewFileName] = useState("");
   const students = dashboard?.assignedStudents ?? [];
   const activeChapter = chapters[activeChapterIdx];
   const projectTitle = students[activeStudentIdx]?.projectTitle || "Project";
+  const feedbackThreads = Array.from(
+  new Map(
+    (activeChapter?.comments || [])
+      .filter((comment) => comment.feedbackThreadId)
+      .map((comment) => [comment.feedbackThreadId!, comment])
+  ).values()
+);
 
   if (loading && !dashboard) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -363,17 +460,120 @@ const [previewFileName, setPreviewFileName] = useState("");
     </div>
   </div>
 )}
-              {activeChapter.comments.length > 0 && (
-                <div className="mt-4 flex flex-col gap-2">
-                  <p className="text-xs font-bold text-muted-foreground">Comments ({activeChapter.comments.length})</p>
-                  {activeChapter.comments.map(c=>(
-                    <div key={c.id} className="bg-muted/30 rounded-xl p-3 border border-border">
-                      <div className="flex items-center justify-between mb-1"><span className="text-xs font-bold text-foreground">{c.userName}</span><span className="text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</span></div>
-                      <p className="text-xs text-muted-foreground">{c.content}</p>
-                    </div>
-                  ))}
+            {activeChapter.comments.length > 0 && (
+  <div className="mt-5 flex flex-col gap-4">
+    <p className="text-xs font-bold text-muted-foreground">
+      Feedback Threads ({feedbackThreads.length})
+    </p>
+
+    {feedbackThreads.map((thread) => {
+      const threadComments = activeChapter.comments
+        .filter(
+          (comment) =>
+            comment.feedbackThreadId === thread.feedbackThreadId
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() -
+            new Date(b.createdAt).getTime()
+        );
+
+      const rootComment = threadComments.find(
+        (comment) => !comment.parentCommentId
+      );
+
+      const isResolved = threadComments.every(
+        (comment) => comment.isResolved
+      );
+
+      return (
+        <div
+          key={thread.feedbackThreadId}
+          className="border border-border rounded-xl overflow-hidden"
+        >
+          {/* Thread Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border">
+            <div>
+              <p className="text-xs font-bold text-foreground">
+                Feedback Thread
+              </p>
+
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {threadComments.length}{" "}
+                {threadComments.length === 1
+                  ? "comment"
+                  : "comments"}
+              </p>
+            </div>
+
+            {isResolved ? (
+              <Badge variant="success">
+                Resolved
+              </Badge>
+            ) : (
+              rootComment && (
+                <button
+                  onClick={() =>
+                    handleResolveComment(
+                      activeChapter.id,
+                      rootComment.id
+                    )
+                  }
+                  disabled={
+                    resolvingCommentId === rootComment.id
+                  }
+                  className="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+
+                  {resolvingCommentId === rootComment.id
+                    ? "Approving..."
+                    : "Approve Feedback"}
+                </button>
+              )
+            )}
+          </div>
+
+          {/* Thread Comments */}
+          <div className="p-3 flex flex-col gap-2">
+            {threadComments.map((c) => (
+              <div
+                key={c.id}
+                className={`rounded-xl p-3 border ${
+                  c.parentCommentId
+                    ? "ml-6 bg-background border-border"
+                    : "bg-muted/30 border-border"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-foreground">
+                    {c.userName}
+                  </span>
+
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(
+                      c.createdAt
+                    ).toLocaleDateString()}
+                  </span>
                 </div>
-              )}
+
+                <p className="text-xs text-muted-foreground">
+                  {c.content}
+                </p>
+
+                {c.parentCommentId && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Reply
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+)}
             </div>
             <div className="border-t border-border px-5 py-4">
               <div className="flex items-center justify-between mb-3">

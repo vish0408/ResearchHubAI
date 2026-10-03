@@ -6,6 +6,8 @@ public interface ILiteratureReviewService
 {
     Task<UploadedDocumentResponse> UploadDocumentAsync(Guid userId, UploadDocumentRequest request);
 
+    Task<LiteratureReviewResponse> AnalyzeLiteratureReviewAsync(Guid userId,AnalyzeLiteratureReviewRequest request);
+
     Task<UploadedDocumentResponse> AnalyzeDocumentAsync(Guid userId, AnalyzeDocumentRequest request);
 
     Task<UploadedDocumentResponse> SummarizeDocumentAsync(Guid userId, SummarizeRequest request);

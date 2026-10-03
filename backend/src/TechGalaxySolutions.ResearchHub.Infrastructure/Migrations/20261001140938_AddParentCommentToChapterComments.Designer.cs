@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TechGalaxySolutions.ResearchHub.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using TechGalaxySolutions.ResearchHub.Infrastructure.Persistence;
 namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001140938_AddParentCommentToChapterComments")]
+    partial class AddParentCommentToChapterComments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -417,16 +420,7 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("FeedbackThreadId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsResolved")
                         .HasColumnType("bit");
 
                     b.Property<int?>("LineNumber")
@@ -445,9 +439,6 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
 
                     b.HasIndex("ChapterId")
                         .HasDatabaseName("IX_ChapterComments_ChapterId");
-
-                    b.HasIndex("FeedbackThreadId")
-                        .HasDatabaseName("IX_ChapterComments_FeedbackThreadId");
 
                     b.HasIndex("ParentCommentId")
                         .HasDatabaseName("IX_ChapterComments_ParentCommentId");
