@@ -7,7 +7,7 @@ import SectionHead from "../../components/common/SectionHead";
 import { studentService } from "../../services/StudentService";
 
 import type { Project, ProjectDocument } from "../../types/Student";
-import type { Chapter } from "../../types/Guide";
+import type { Chapter, ChapterVersion } from "../../types/Guide";
 
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ const statusVariant = (
     return "warning";
   }
 
-  if (status === "Draft") return "default";
+ if (status === "Draft" || status === "Submitted") {
+  return "warning";
+}
 
   return "outline";
 };
@@ -60,6 +62,7 @@ export default function StudentChapterVersions() {
   const [projectId, setProjectId] = useState<string>("");
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
 
   const [chapterVersions, setChapterVersions] = useState<
@@ -70,10 +73,12 @@ export default function StudentChapterVersions() {
 
   const [versionChapterId, setVersionChapterId] = useState<string | null>(null);
 
-  const [versionContent, setVersionContent] = useState("");
+ const [versionFile, setVersionFile] = useState<File | null>(null);
 
   const [chapterTitle, setChapterTitle] = useState("");
   const [chapterContent, setChapterContent] = useState("");
+
+  const [chapterFile, setChapterFile] = useState<File | null>(null);
   const [chapterOrder, setChapterOrder] = useState(1);
 
   const [loading, setLoading] = useState(true);
@@ -171,19 +176,21 @@ export default function StudentChapterVersions() {
       return;
     }
 
+    if (!chapterFile) {
+  setError("Please select a chapter file");
+  return;
+}
+
     try {
       setError("");
       setMessage("");
 
       const createdChapter = await studentService.createChapter(
-        projectId,
-        {
-          title: chapterTitle.trim(),
-          content: chapterContent.trim(),
-          order: chapterOrder,
-        }
-      );
-
+  projectId,
+  chapterTitle.trim(),
+  chapterOrder,
+  chapterFile
+);
       setChapters((prev) => [...prev, createdChapter]);
 
       setChapterTitle("");
@@ -216,8 +223,8 @@ export default function StudentChapterVersions() {
     return;
   }
 
-  if (!versionContent.trim()) {
-    setError("Version content is required");
+  if (!versionFile) {
+    setError("Please select a chapter file");
     return;
   }
 
@@ -229,9 +236,7 @@ export default function StudentChapterVersions() {
       await studentService.createChapterVersion(
         projectId,
         chapterId,
-        {
-          content: versionContent.trim(),
-        }
+        versionFile
       );
 
     setChapterVersions((prev) => ({
@@ -242,15 +247,15 @@ export default function StudentChapterVersions() {
       ],
     }));
 
-    setVersionContent("");
+    setVersionFile(null);
     setVersionChapterId(null);
 
-    setMessage("New chapter version created successfully");
+    setMessage("New chapter version uploaded successfully");
   } catch (e: unknown) {
     setError(
       e instanceof Error
         ? e.message
-        : "Failed to create chapter version"
+        : "Failed to upload chapter version"
     );
   }
 };
@@ -477,23 +482,27 @@ export default function StudentChapterVersions() {
               />
             </div>
 
-            {/* Content */}
-            <div>
-              <label className="text-xs font-bold text-foreground">
-                Chapter Content
-              </label>
+ {/* Chapter File */}
+<div>
+  <label className="text-xs font-bold text-foreground">
+    Chapter File
+  </label>
 
-              <textarea
-                value={chapterContent}
-                onChange={(e) =>
-                  setChapterContent(e.target.value)
-                }
-                placeholder="Write your chapter content..."
-                rows={5}
-                className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary resize-none"
-              />
-            </div>
+  <input
+    type="file"
+    accept=".pdf,.doc,.docx"
+    onChange={(e) => {
+      setChapterFile(e.target.files?.[0] || null);
+    }}
+    className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm"
+  />
 
+  {chapterFile && (
+    <p className="mt-2 text-xs text-muted-foreground">
+      Selected: {chapterFile.name}
+    </p>
+  )}
+</div>
             {/* Order */}
             <div>
               <label className="text-xs font-bold text-foreground">
@@ -565,9 +574,9 @@ export default function StudentChapterVersions() {
                     </span>
                   </div>
 <div className="flex items-center gap-2">
-  <Badge variant={statusVariant(c.status)}>
-    {c.status}
-  </Badge>
+  {/* <Badge variant={statusVariant(c.status)}>
+    {c.status === "Draft" ? "Pending" : c.status}
+  </Badge> */}
 
   <Button
     size="sm"
@@ -575,7 +584,7 @@ export default function StudentChapterVersions() {
     onClick={() => {
       setError("");
       setMessage("");
-      setVersionContent("");
+      setVersionFile(null);
       setVersionChapterId(c.id);
     }}
   >
@@ -607,27 +616,32 @@ export default function StudentChapterVersions() {
   <div className="px-4 pb-4">
     <div className="border border-border rounded-xl p-4 space-y-3">
       <div>
-        <label className="text-xs font-bold text-foreground">
-          New Version Content
-        </label>
+  <label className="text-xs font-bold text-foreground">
+    Upload Chapter Version
+  </label>
 
-        <textarea
-          value={versionContent}
-          onChange={(e) =>
-            setVersionContent(e.target.value)
-          }
-          placeholder="Write the revised chapter content..."
-          rows={5}
-          className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary resize-none"
-        />
-      </div>
+  <input
+    type="file"
+    accept=".pdf,.doc,.docx"
+    onChange={(e) => {
+      setVersionFile(e.target.files?.[0] || null);
+    }}
+    className="w-full mt-1 px-3 py-2.5 rounded-lg border border-border bg-background text-sm"
+  />
+
+  {versionFile && (
+    <p className="mt-2 text-xs text-muted-foreground">
+      Selected: {versionFile.name}
+    </p>
+  )}
+</div>
 
       <div className="flex gap-2">
         <Button
           variant="outline"
           onClick={() => {
             setVersionChapterId(null);
-            setVersionContent("");
+              setVersionFile(null);
             setError("");
           }}
         >
@@ -639,7 +653,7 @@ export default function StudentChapterVersions() {
             handleCreateVersion(c.id)
           }
         >
-          Create Version
+         Upload Version
         </Button>
       </div>
     </div>
@@ -660,13 +674,31 @@ export default function StudentChapterVersions() {
           </span>
 
           <Badge variant={statusVariant(version.status)}>
-            {version.status}
-          </Badge>
+  {version.status === "Draft" || version.status === "Submitted"
+    ? "Pending"
+    : version.status}
+</Badge>
+
         </div>
 
-        <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
-          {version.content}
-        </p>
+        {version.fileName ? (
+  <div className="mt-3 space-y-1">
+    <p className="text-sm font-medium text-foreground">
+      📄 {version.fileName}
+    </p>
+
+    <p className="text-xs text-muted-foreground">
+      Type: {version.fileType || "Unknown"}
+      {version.fileSize
+        ? ` • ${(version.fileSize / 1024 / 1024).toFixed(2)} MB`
+        : ""}
+    </p>
+  </div>
+) : (
+  <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap">
+    {version.content}
+  </p>
+)}
 
         <p className="mt-2 text-[11px] text-muted-foreground">
           Created{" "}

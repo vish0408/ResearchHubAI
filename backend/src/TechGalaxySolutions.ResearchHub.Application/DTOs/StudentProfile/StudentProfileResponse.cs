@@ -10,6 +10,7 @@ public class StudentProfileResponse
     public string Department { get; set; } = string.Empty;
     public string Institution { get; set; } = string.Empty;
     public string? ResearchTopic { get; set; }
+    public string? ProfilePictureUrl { get; set; }
     public Guid? GuideId { get; set; }
     public string? GuideName { get; set; }
 }

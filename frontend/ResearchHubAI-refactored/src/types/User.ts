@@ -7,6 +7,9 @@ export interface CurrentUser {
   dept: string;
   institution: string;
   avatar: string;
+
+  profilePictureUrl?: string;
+
   enrollment?: string;
   designation?: string;
   collegeId?: string;

@@ -36,12 +36,22 @@ export default function StudentMeetings() {
     }
   };
 
+  const parseMeetingDate = (value: string) => {
+  // API returns UTC timestamps without the Z suffix.
+  const normalized = /Z$/i.test(value) ? value : `${value}Z`;
+  return new Date(normalized);
+};
+
   useEffect(() => {
     loadMeetings();
   }, []);
 
   const now = Date.now();
-  const upcoming = meetings.filter((m) => m.status !== "Completed" && new Date(m.scheduledAt).getTime() >= now);
+  const upcoming = meetings.filter(
+  (m) =>
+    m.status !== "Completed" &&
+    parseMeetingDate(m.scheduledAt).getTime() >= now
+);
   const pendingRequests = meetings.filter((m) => m.status === "Pending" || m.status === "Requested");
   const completed = meetings.filter((m) => m.status === "Completed");
 
@@ -66,13 +76,27 @@ export default function StudentMeetings() {
   };
 
   const handleDelete = async (id: string) => {
-    try {
-      await studentService.deleteMeeting(id);
-      setMeetings((prev) => prev.filter((m) => m.id !== id));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to delete meeting");
-    }
-  };
+  try {
+    setError("");
+
+
+const updatedMeeting = await studentService.cancelMeeting(id);
+
+setMeetings((prev) =>
+  prev.map((m) => (m.id === id ? updatedMeeting : m))
+);
+
+  } catch (e: any) {
+    console.error("Cancel meeting error:", e);
+
+    setError(
+      e?.response?.data?.message ||
+      e?.response?.data?.title ||
+      e?.message ||
+      "Failed to cancel meeting"
+    );
+  }
+};
 
   if (loading) {
     return (
@@ -168,15 +192,29 @@ export default function StudentMeetings() {
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    {new Date(m.scheduledAt).toLocaleString()} · {m.durationMinutes} min
-                  </p>
+  {parseMeetingDate(m.scheduledAt).toLocaleDateString("en-IN")} ·{" "}
+  {parseMeetingDate(m.scheduledAt).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })}{" "}
+  · {m.durationMinutes} min
+</p>
+
                   {m.agenda && <p className="text-xs text-muted-foreground mb-3">{m.agenda}</p>}
-                  <button
+                  {/* <button
                     onClick={() => handleDelete(m.id)}
                     className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium"
                   >
                     <Trash2 className="w-3 h-3" /> Cancel
-                  </button>
+                  </button> */}
+                  <button
+  onClick={() => handleDelete(m.id)}
+  disabled={m.status === "Completed" || m.status === "Cancelled"}
+  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  <Trash2 className="w-3 h-3" /> Cancel
+</button>
                 </div>
               ))}
             </div>

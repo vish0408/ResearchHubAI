@@ -17,6 +17,8 @@ public class AIProviderSettings
 
     public string Model { get; set; } = string.Empty;
 
+    public List<string> FallbackModels { get; set; } = new();
+
     public string ApiKey { get; set; } = string.Empty;
 
     public int MaxRetries { get; set; } = 3;

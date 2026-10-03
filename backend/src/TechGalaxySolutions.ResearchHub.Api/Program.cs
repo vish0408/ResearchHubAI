@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Microsoft.Extensions.FileProviders;
 using TechGalaxySolutions.ResearchHub.Api.Middlewares;
 using TechGalaxySolutions.ResearchHub.Application;
 using TechGalaxySolutions.ResearchHub.Application.Interfaces;
@@ -156,6 +157,24 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors("AllowFrontend");
+
+// Serve uploaded files
+var configuredUploadPath = builder.Configuration["FileStorage:Path"];
+
+var uploadPath = string.IsNullOrWhiteSpace(configuredUploadPath)
+    ? Path.Combine(app.Environment.ContentRootPath, "Uploads")
+    : Path.IsPathRooted(configuredUploadPath)
+        ? configuredUploadPath
+        : Path.Combine(app.Environment.ContentRootPath, configuredUploadPath);
+
+if (Directory.Exists(uploadPath))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(uploadPath),
+        RequestPath = "/uploads"
+    });
+}
 
 app.UseAuthentication();
 

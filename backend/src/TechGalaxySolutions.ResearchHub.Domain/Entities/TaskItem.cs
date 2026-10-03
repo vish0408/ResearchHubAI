@@ -21,4 +21,8 @@ public class TaskItem : BaseEntity
     public Guid? AssignedToId { get; set; }
 
     public User? AssignedTo { get; set; }
+
+    public Guid? MilestoneId { get; set; }
+
+public Milestone? Milestone { get; set; }
 }

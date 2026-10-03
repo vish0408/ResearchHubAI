@@ -57,35 +57,63 @@ public class MeetingService : IMeetingService
         return _mapper.Map<MeetingResponse>(meeting);
     }
 
-    public async Task<MeetingResponse> CreateAsync(Guid guideId, CreateMeetingRequest request)
+    public async Task<MeetingResponse> CreateAsync(
+    Guid requesterUserId,
+    CreateMeetingRequest request)
+{
+    var guideId = requesterUserId;
+
+    var participantIds = (request.ParticipantIds ?? [])
+        .Distinct()
+        .ToList();
+
+    // Student is requesting a meeting with their assigned guide
+    var studentProfile = await _context.Set<StudentProfile>()
+        .AsNoTracking()
+        .FirstOrDefaultAsync(s =>
+            s.UserId == requesterUserId &&
+            !s.IsDeleted);
+
+    if (studentProfile?.GuideId is Guid assignedGuideId)
     {
-        var meeting = new Meeting
-        {
-            GuideId = guideId,
-            Title = request.Title,
-            Description = request.Description,
-            ScheduledAt = request.ScheduledAt,
-            DurationMinutes = request.DurationMinutes,
-            Agenda = request.Agenda,
-            MeetingLink = request.MeetingLink,
-            Status = MeetingStatus.Scheduled,
-        };
+        guideId = assignedGuideId;
 
-        _context.Set<Meeting>().Add(meeting);
-
-        foreach (var participantId in request.ParticipantIds)
+        // Make sure the student is also a participant
+        if (!participantIds.Contains(requesterUserId))
         {
-            _context.Set<MeetingParticipant>().Add(new MeetingParticipant
-            {
-                MeetingId = meeting.Id,
-                UserId = participantId,
-            });
+            participantIds.Add(requesterUserId);
         }
-
-        await _context.SaveChangesAsync();
-
-        return await GetByIdAsync(meeting.Id);
     }
+
+    var meeting = new Meeting
+    {
+        GuideId = guideId,
+        Title = request.Title,
+        Description = request.Description,
+        ScheduledAt = request.ScheduledAt,
+        DurationMinutes = request.DurationMinutes,
+        Agenda = request.Agenda,
+        MeetingLink = request.MeetingLink,
+        Status = MeetingStatus.Scheduled,
+    };
+
+    _context.Set<Meeting>().Add(meeting);
+
+    foreach (var participantId in participantIds)
+    {
+        _context.Set<MeetingParticipant>().Add(new MeetingParticipant
+        {
+            MeetingId = meeting.Id,
+            UserId = participantId,
+        });
+    }
+
+    await _context.SaveChangesAsync();
+
+    return await GetByIdAsync(meeting.Id);
+}
+
+
 
     public async Task<MeetingResponse> UpdateAsync(Guid meetingId, Guid userId, UpdateMeetingRequest request)
     {
@@ -128,4 +156,37 @@ public class MeetingService : IMeetingService
         meeting.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
     }
+    public async Task<MeetingResponse> CancelAsync(Guid meetingId, Guid userId)
+{
+    var meeting = await _context.Set<Meeting>()
+        .Include(m => m.Guide)
+        .Include(m => m.Participants)
+            .ThenInclude(p => p.User)
+        .FirstOrDefaultAsync(m =>
+            m.Id == meetingId &&
+            !m.IsDeleted);
+
+    if (meeting == null)
+        throw new KeyNotFoundException("Meeting not found");
+
+    var isGuide = meeting.GuideId == userId;
+
+    var isParticipant = meeting.Participants
+        .Any(p => p.UserId == userId);
+
+    if (!isGuide && !isParticipant)
+        throw new UnauthorizedAccessException(
+            "You are not allowed to cancel this meeting");
+
+    if (meeting.Status == MeetingStatus.Completed)
+        throw new InvalidOperationException(
+            "Completed meetings cannot be cancelled");
+
+    meeting.Status = MeetingStatus.Cancelled;
+    meeting.UpdatedAt = DateTime.UtcNow;
+
+    await _context.SaveChangesAsync();
+
+    return _mapper.Map<MeetingResponse>(meeting);
+}
 }

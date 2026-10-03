@@ -26,6 +26,19 @@ public class LiteratureReviewController : ControllerBase
         return Ok(result);
     }
 
+
+    [HttpPost("analyze-review")]
+public async Task<IActionResult> AnalyzeReview(
+    [FromBody] AnalyzeLiteratureReviewRequest request)
+{
+    var userId = User.GetUserId();
+
+    var result = await _literatureService
+        .AnalyzeLiteratureReviewAsync(userId, request);
+
+    return Ok(result);
+}
+
     [HttpPost("analyze")]
     public async Task<IActionResult> Analyze([FromBody] AnalyzeDocumentRequest request)
     {
@@ -74,13 +87,29 @@ public class LiteratureReviewController : ControllerBase
         return Ok(result);
     }
 
-    [HttpGet("history")]
-    public async Task<IActionResult> GetHistory()
-    {
-        var userId = User.GetUserId();
-        var result = await _literatureService.GetHistoryAsync(userId);
-        return Ok(result);
-    }
+    // [HttpGet("history")]
+    // public async Task<IActionResult> GetHistory()
+    // {
+    //     var userId = User.GetUserId();
+    //     var result = await _literatureService.GetHistoryAsync(userId);
+    //     return Ok(result);
+    // }
+
+
+     [HttpGet("history")]
+public async Task<IActionResult> GetHistory()
+{
+    var userId = User.GetUserId();
+
+    Console.WriteLine($"[Literature History] UserId: {userId}");
+
+    var result = await _literatureService.GetHistoryAsync(userId);
+
+    Console.WriteLine($"[Literature History] Count: {result.Count}");
+
+    return Ok(result);
+}
+
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)

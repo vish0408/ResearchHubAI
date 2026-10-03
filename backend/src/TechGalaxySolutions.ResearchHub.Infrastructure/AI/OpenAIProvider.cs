@@ -57,11 +57,18 @@ public class OpenAIProvider : IAIProvider
             {
                 using var response = await _httpClient.PostAsJsonAsync("chat/completions", body, JsonOptions, timeoutCts.Token);
 
-                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                {
-                    var retryAfter = response.Headers.RetryAfter?.Delta;
-                    throw new AiRateLimitException(ProviderType, retryAfter);
-                }
+               if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+{
+    var errorBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+
+    _logger.LogError(
+        "OpenAI 429 response: {ErrorBody}",
+        errorBody);
+
+    var retryAfter = response.Headers.RetryAfter?.Delta;
+
+    throw new AiRateLimitException(ProviderType, retryAfter);
+}
 
                 response.EnsureSuccessStatusCode();
 

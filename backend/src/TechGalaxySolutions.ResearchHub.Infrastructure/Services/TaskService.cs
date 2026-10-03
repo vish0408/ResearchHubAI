@@ -71,6 +71,7 @@ private readonly IProjectService _projectService;
             Status = TaskItemStatus.NotStarted,
             DueDate = request.DueDate,
             AssignedToId = request.AssignedToId,
+            MilestoneId = request.MilestoneId,
         };
 
         // _context.TaskItems.Add(task);
@@ -107,7 +108,9 @@ return await GetByIdAsync(task.Id, userId);
 
         // return _mapper.Map<TaskItemResponse>(task);
 
-        await _context.SaveChangesAsync();
+       await _context.SaveChangesAsync();
+
+await UpdateMilestoneCompletionAsync(task.MilestoneId);
 
 await _projectService.RecalculateCompletionPercentageAsync(task.ProjectId);
 
@@ -132,6 +135,33 @@ await _context.SaveChangesAsync();
 await _projectService.RecalculateCompletionPercentageAsync(task.ProjectId);
 
     }
+
+
+private async Task UpdateMilestoneCompletionAsync(Guid? milestoneId)
+{
+    if (!milestoneId.HasValue)
+        return;
+
+    var milestone = await _context.Milestones
+        .Include(m => m.Tasks)
+        .FirstOrDefaultAsync(m =>
+            m.Id == milestoneId.Value &&
+            !m.IsDeleted);
+
+    if (milestone == null)
+        return;
+
+    var activeTasks = milestone.Tasks
+        .Where(t => !t.IsDeleted)
+        .ToList();
+
+    milestone.IsCompleted =
+        activeTasks.Count > 0 &&
+        activeTasks.All(t => t.Status == TaskItemStatus.Completed);
+
+    await _context.SaveChangesAsync();
+}
+
 
     private async Task VerifyProjectAccess(Guid projectId, Guid userId)
     {

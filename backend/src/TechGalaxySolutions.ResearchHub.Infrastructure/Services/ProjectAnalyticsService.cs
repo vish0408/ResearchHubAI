@@ -231,30 +231,62 @@ public class ProjectAnalyticsService : IProjectAnalyticsService
             PendingReviews = pendingReviews.Count,
             UpcomingMeetings = upcomingMeetings.Count,
             AssignedStudents = assignedStudents.Select(s =>
-            {
-                var studentProjects = projects.Where(p => p.StudentId == s.UserId).ToList();
-                var coursework = courseworkLookup[s.Id].ToList();
-                var earned = coursework.Where(UserManagementService.IsCourseworkPassed).Sum(c => c.Credits);
-                return new AssignedStudentSummary
-                {
-                    UserId = s.UserId,
-                    ProjectId = studentProjects.FirstOrDefault()?.Id,
-                    FullName = s.User.FullName,
-                    Email = s.User.Email,
-                    Enrollment = s.Enrollment,
-                    Department = s.Department,
-                    ResearchTopic = s.ResearchTopic ?? string.Empty,
-                    ProjectTitle = studentProjects.FirstOrDefault()?.Title,
-                    ProjectStatus = studentProjects.FirstOrDefault()?.Status.ToString(),
-                    CompletionPercentage = studentProjects.FirstOrDefault()?.CompletionPercentage ?? 0,
-                    JoiningCohort = s.JoiningCohort,
-                    ResearchStageName = s.ResearchStageId.HasValue && stageNames.TryGetValue(s.ResearchStageId.Value, out var sn) ? sn : null,
-                    RequiredCredits = s.RequiredCredits,
-                    EarnedCredits = earned,
-                    PendingPapers = coursework.Count(c => !UserManagementService.IsCourseworkPassed(c) && !c.IsCompleted),
-                    CourseworkStatus = UserManagementService.DeriveCourseworkStatus(s.RequiredCredits, earned, coursework),
-                };
-            }).ToList(),
+{
+    var studentProjects = projects
+        .Where(p => p.StudentId == s.UserId)
+        .OrderByDescending(p => p.CreatedAt)
+        .ToList();
+
+    var coursework = courseworkLookup[s.Id].ToList();
+
+    var earned = coursework
+        .Where(UserManagementService.IsCourseworkPassed)
+        .Sum(c => c.Credits);
+
+    return new AssignedStudentSummary
+    {
+        UserId = s.UserId,
+        ProjectId = studentProjects.FirstOrDefault()?.Id,
+
+        FullName = s.User.FullName,
+        Email = s.User.Email,
+        Enrollment = s.Enrollment,
+        Department = s.Department,
+        ResearchTopic = s.ResearchTopic ?? string.Empty,
+
+        ProjectTitle = studentProjects.FirstOrDefault()?.Title,
+        ProjectStatus = studentProjects.FirstOrDefault()?.Status.ToString(),
+        CompletionPercentage =
+            studentProjects.FirstOrDefault()?.CompletionPercentage ?? 0,
+
+        JoiningCohort = s.JoiningCohort,
+
+        ResearchStageName =
+            s.ResearchStageId.HasValue &&
+            stageNames.TryGetValue(
+                s.ResearchStageId.Value,
+                out var sn)
+                ? sn
+                : null,
+
+        RequiredCredits = s.RequiredCredits,
+        EarnedCredits = earned,
+
+        PendingPapers = coursework.Count(c =>
+            !UserManagementService.IsCourseworkPassed(c) &&
+            !c.IsCompleted),
+
+        CourseworkStatus =
+            UserManagementService.DeriveCourseworkStatus(
+                s.RequiredCredits,
+                earned,
+                coursework)
+    };
+}).ToList(),
+
+
+
+
             PendingReviewList = pendingReviews.Select(r => new PendingReviewSummary
             {
                 ProjectId = r.ProjectId,
@@ -277,6 +309,7 @@ public class ProjectAnalyticsService : IProjectAnalyticsService
             PendingThesisReviews = pendingThesisReviews,
         };
     }
+
     public async Task<HodDashboardResponse> GetHodDashboardAsync(Guid userId)
     {
         var hod = await _context.Set<Hod>().AsNoTracking()

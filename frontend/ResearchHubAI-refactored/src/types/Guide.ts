@@ -127,8 +127,14 @@ export interface ChapterComment {
   userId: string;
   userName: string;
   content: string;
-  lineNumber: number | null;
+  lineNumber?: number | null;
   createdAt: string;
+
+  feedbackThreadId?: string | null;
+  parentCommentId?: string | null;
+
+  isResolved: boolean;
+    isRead: boolean;
 }
 
 export interface Meeting {
@@ -173,6 +179,12 @@ export type ChapterVersion = {
   chapterId: string;
   versionNumber: number;
   content: string;
+
+  fileName: string | null;
+  filePath: string | null;
+  fileType: string | null;
+  fileSize: number | null;
+
   status: string;
   createdAt: string;
 };

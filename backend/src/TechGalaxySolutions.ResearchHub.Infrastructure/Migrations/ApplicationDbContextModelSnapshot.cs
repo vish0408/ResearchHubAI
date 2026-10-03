@@ -417,11 +417,23 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("FeedbackThreadId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsResolved")
                         .HasColumnType("bit");
 
                     b.Property<int?>("LineNumber")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("ParentCommentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -433,6 +445,12 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
 
                     b.HasIndex("ChapterId")
                         .HasDatabaseName("IX_ChapterComments_ChapterId");
+
+                    b.HasIndex("FeedbackThreadId")
+                        .HasDatabaseName("IX_ChapterComments_FeedbackThreadId");
+
+                    b.HasIndex("ParentCommentId")
+                        .HasDatabaseName("IX_ChapterComments_ParentCommentId");
 
                     b.HasIndex("UserId");
 
@@ -454,6 +472,18 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("FileName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FilePath")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FileType")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -2346,6 +2376,9 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<string>("PhdMode")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("RegistrationDate")
                         .HasColumnType("datetime2");
 
@@ -2452,6 +2485,9 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<Guid?>("MilestoneId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
@@ -2471,6 +2507,8 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedToId");
+
+                    b.HasIndex("MilestoneId");
 
                     b.HasIndex("ProjectId")
                         .HasDatabaseName("IX_TaskItems_ProjectId");
@@ -2786,6 +2824,11 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.ChapterComment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -2793,6 +2836,8 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Chapter");
+
+                    b.Navigation("ParentComment");
 
                     b.Navigation("User");
                 });
@@ -3387,6 +3432,11 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .HasForeignKey("AssignedToId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.Milestone", "Milestone")
+                        .WithMany("Tasks")
+                        .HasForeignKey("MilestoneId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.Project", "Project")
                         .WithMany("Tasks")
                         .HasForeignKey("ProjectId")
@@ -3394,6 +3444,8 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("AssignedTo");
+
+                    b.Navigation("Milestone");
 
                     b.Navigation("Project");
                 });
@@ -3454,6 +3506,11 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.Navigation("Versions");
                 });
 
+            modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.ChapterComment", b =>
+                {
+                    b.Navigation("Replies");
+                });
+
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.ChatMessage", b =>
                 {
                     b.Navigation("Citations");
@@ -3491,6 +3548,11 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.Meeting", b =>
                 {
                     b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.Milestone", b =>
+                {
+                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.Project", b =>

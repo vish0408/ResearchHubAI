@@ -65,13 +65,32 @@ public class ExceptionMiddleware
             context.Response.ContentType = "application/json";
             await WriteErrorAsync(context, "Gateway Timeout", "The AI service request timed out. Please try again.");
         }
-        catch (AiException ex)
-        {
-            await LogExceptionAsync(context, ex);
-            context.Response.StatusCode = ex.HttpStatusCode ?? 502;
-            context.Response.ContentType = "application/json";
-            await WriteErrorAsync(context, "AI Service Error", "An error occurred while processing your request through the AI service.");
-        }
+       catch (AiException ex)
+{
+    await LogExceptionAsync(context, ex);
+
+    context.Response.StatusCode = ex.HttpStatusCode ?? 502;
+    context.Response.ContentType = "application/json";
+
+    var isQuotaExceeded =
+        context.Response.StatusCode == 429 &&
+        ex.Message.Contains("daily free-tier quota", StringComparison.OrdinalIgnoreCase);
+
+    if (isQuotaExceeded)
+    {
+        await WriteErrorAsync(
+            context,
+            "AI Quota Exceeded",
+            ex.Message);
+    }
+    else
+    {
+        await WriteErrorAsync(
+            context,
+            "AI Service Error",
+            "An error occurred while processing your request through the AI service.");
+    }
+}
         catch (ConflictException ex)
         {
             await LogExceptionAsync(context, ex);
