@@ -4,6 +4,8 @@ using TechGalaxySolutions.ResearchHub.Application.DTOs.Dashboard;
 using TechGalaxySolutions.ResearchHub.Application.Interfaces;
 using TechGalaxySolutions.ResearchHub.Domain.Entities.Enums;
 using TechGalaxySolutions.ResearchHub.Infrastructure.Persistence;
+using TechGalaxySolutions.ResearchHub.Domain.Entities;
+  
 
 namespace TechGalaxySolutions.ResearchHub.Infrastructure.Services;
 
@@ -35,61 +37,75 @@ public class DashboardService : IDashboardService
             .ToListAsync();
 
         var response = new DashboardResponse();
-        // Coursework Summary
+      
+
+// Coursework Summary
 var studentProfile = await _context.StudentProfiles
     .AsNoTracking()
-    .FirstOrDefaultAsync(sp => sp.UserId == userId && !sp.IsDeleted);
+    .FirstOrDefaultAsync(sp =>
+        sp.UserId == userId && !sp.IsDeleted);
 
 if (studentProfile != null)
 {
-    var coursework = await _context.ScholarCoursework
+    var approvedCoursework = await _context
+        .Set<StudentCourseworkSubmission>()
         .AsNoTracking()
         .Where(c =>
             c.StudentProfileId == studentProfile.Id &&
-            !c.IsDeleted)
+            !c.IsDeleted &&
+            c.Status == ReviewStatus.Approved)
         .ToListAsync();
 
-    if (coursework.Count > 0)
+    var pendingPapers = await _context
+        .Set<StudentCourseworkSubmission>()
+        .AsNoTracking()
+        .CountAsync(c =>
+            c.StudentProfileId == studentProfile.Id &&
+            !c.IsDeleted &&
+            c.Status == ReviewStatus.Pending);
+
+    var earnedCredits = approvedCoursework.Sum(c => c.Credits);
+    var passedPapers = approvedCoursework.Count;
+
+    response.EarnedCredits = earnedCredits;
+    response.PassedPapers = passedPapers;
+    response.PendingPapers = pendingPapers;
+
+    // Do not treat a missing requirement as zero.
+    response.RequiredCredits = studentProfile.RequiredCredits;
+
+    if (!studentProfile.RequiredCredits.HasValue ||
+        studentProfile.RequiredCredits.Value <= 0)
     {
-        var requiredCredits = coursework.Sum(c => c.Credits);
-
-        var earnedCredits = coursework
-            .Where(c => c.IsCompleted)
-            .Sum(c => c.Credits);
-
-        var passedPapers = coursework.Count(c => c.IsCompleted);
-
-        var pendingPapers = coursework.Count(c => !c.IsCompleted);
-
-        response.RequiredCredits = requiredCredits;
-        response.EarnedCredits = earnedCredits;
-        response.PassedPapers = passedPapers;
-        response.PendingPapers = pendingPapers;
-
         response.CourseworkStatus =
-            earnedCredits == 0
-                ? "Not started"
-                : earnedCredits >= requiredCredits
-                    ? "Completed"
-                    : "In Progress";
+            "Requirement not configured";
 
-        response.CourseworkCompletionPercentage =
-            requiredCredits > 0
-                ? Math.Round(
-                    (decimal)earnedCredits / requiredCredits * 100,
-                    2)
-                : 0;
+        response.CourseworkCompletionPercentage = 0;
     }
     else
     {
-        response.CourseworkStatus = "Not started";
-        response.RequiredCredits = 0;
-        response.EarnedCredits = 0;
-        response.PassedPapers = 0;
-        response.PendingPapers = 0;
-        response.CourseworkCompletionPercentage = 0;
+        var requiredCredits = studentProfile.RequiredCredits.Value;
+
+        response.CourseworkStatus =
+            earnedCredits >= requiredCredits
+                ? "Completed"
+                : earnedCredits > 0
+                    ? "In Progress"
+                    : "Not started";
+
+        response.CourseworkCompletionPercentage =
+            Math.Round(
+                (decimal)earnedCredits / requiredCredits * 100,
+                2);
+
+        // Prevent percentages above 100.
+        response.CourseworkCompletionPercentage =
+            Math.Min(
+                response.CourseworkCompletionPercentage,
+                100);
     }
 }
+
 
         if (project != null)
         {

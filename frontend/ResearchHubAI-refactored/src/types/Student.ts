@@ -116,3 +116,31 @@ export interface DocumentSummary {
   uploadedAt: string;
   uploaderName: string;
 }
+
+export interface StudentCoursework {
+  id: string;
+  studentProfileId: string;
+
+  courseName: string;
+  courseCode?: string | null;
+  courseType: string;
+  credits: number;
+  institution?: string | null;
+  description?: string | null;
+
+  startDate?: string | null;
+  completionDate: string;
+
+  certificateFileName: string;
+  certificateFileType: string;
+  certificateFileSize: number;
+
+  status: "Pending" | "Approved" | "Rejected";
+  guideFeedback?: string | null;
+
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+
+  createdAt: string;
+  updatedAt?: string | null;
+}

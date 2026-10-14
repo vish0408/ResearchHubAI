@@ -63,7 +63,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Hod> Hods => Set<Hod>();
     public DbSet<ResearchStage> ResearchStages => Set<ResearchStage>();
     public DbSet<ScholarCoursework> ScholarCoursework => Set<ScholarCoursework>();
-    
+    public DbSet<StudentCourseworkSubmission> StudentCourseworkSubmissions
+    => Set<StudentCourseworkSubmission>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -110,6 +112,31 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(c => new { c.StudentProfileId, c.PaperCode }).IsUnique().HasFilter("[IsDeleted] = 0");
             entity.Property(c => c.Marks).HasPrecision(5, 2);
         });
+
+        modelBuilder.Entity<StudentCourseworkSubmission>(entity =>
+{
+    entity.HasOne(c => c.StudentProfile)
+        .WithMany()
+        .HasForeignKey(c => c.StudentProfileId)
+        .OnDelete(DeleteBehavior.NoAction);
+
+    entity.HasOne(c => c.Reviewer)
+        .WithMany()
+        .HasForeignKey(c => c.ReviewedBy)
+        .OnDelete(DeleteBehavior.NoAction);
+
+    entity.HasIndex(c => c.StudentProfileId)
+        .HasDatabaseName("IX_StudentCourseworkSubmissions_StudentProfileId");
+
+    entity.HasIndex(c => c.ReviewedBy)
+        .HasDatabaseName("IX_StudentCourseworkSubmissions_ReviewedBy");
+
+    entity.HasIndex(c => c.Status)
+        .HasDatabaseName("IX_StudentCourseworkSubmissions_Status");
+
+    entity.Property(c => c.Status)
+        .HasConversion<string>();
+});
 
         modelBuilder.Entity<Project>(entity =>
         {

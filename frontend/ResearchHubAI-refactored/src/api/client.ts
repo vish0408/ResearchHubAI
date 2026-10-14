@@ -223,6 +223,38 @@ class ApiClient {
     } finally { clearTimeout(timeout); }
   }
 
+
+
+  async uploadPut<T>(
+  path: string,
+  formData: FormData
+): Promise<ApiResponse<T>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const headers: Record<string, string> = {};
+    const token = this.getAccessToken();
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "PUT",
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+
+    return this.handleResponse<T>(response);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+
+
   async downloadBlob(path: string, signal?: AbortSignal): Promise<{ data: Blob; fileName: string; contentType: string }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60000);

@@ -2340,6 +2340,92 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                     b.ToTable("Semesters");
                 });
 
+            modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.StudentCourseworkSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CertificateFileName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("CertificateFileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CertificateFileType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CertificateStoredFilePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CompletionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CourseCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CourseName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CourseType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Credits")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("GuideFeedback")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Institution")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<Guid>("StudentProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewedBy")
+                        .HasDatabaseName("IX_StudentCourseworkSubmissions_ReviewedBy");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_StudentCourseworkSubmissions_Status");
+
+                    b.HasIndex("StudentProfileId")
+                        .HasDatabaseName("IX_StudentCourseworkSubmissions_StudentProfileId");
+
+                    b.ToTable("StudentCourseworkSubmissions");
+                });
+
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.StudentProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3384,6 +3470,24 @@ namespace TechGalaxySolutions.ResearchHub.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("AcademicYear");
+                });
+
+            modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.StudentCourseworkSubmission", b =>
+                {
+                    b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.User", "Reviewer")
+                        .WithMany()
+                        .HasForeignKey("ReviewedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("TechGalaxySolutions.ResearchHub.Domain.Entities.StudentProfile", "StudentProfile")
+                        .WithMany()
+                        .HasForeignKey("StudentProfileId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Reviewer");
+
+                    b.Navigation("StudentProfile");
                 });
 
             modelBuilder.Entity("TechGalaxySolutions.ResearchHub.Domain.Entities.StudentProfile", b =>
