@@ -141,12 +141,16 @@ export default function StudentProgressTracker() {
       </p>
     </div>
 
-    <div>
-      <p className="text-xs text-muted-foreground">Credits Earned</p>
-      <p className="text-sm font-bold text-foreground mt-0.5">
-        {data?.earnedCredits ?? 0} / {data?.requiredCredits ?? 0}
-      </p>
-    </div>
+  
+<div>
+  <p className="text-xs text-muted-foreground">Credits Earned</p>
+  <p className="text-sm font-bold text-foreground mt-0.5">
+    {data?.requiredCredits != null && data.requiredCredits > 0
+      ? `${data?.earnedCredits ?? 0} / ${data.requiredCredits}`
+      : `${data?.earnedCredits ?? 0} Credits Earned`}
+  </p>
+</div>
+
 
     <div>
       <p className="text-xs text-muted-foreground">Papers</p>

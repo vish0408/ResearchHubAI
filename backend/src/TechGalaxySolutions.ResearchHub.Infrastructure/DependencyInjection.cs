@@ -79,6 +79,9 @@ public static class DependencyInjection
         // Thesis Review
         services.AddScoped<IThesisReviewService, ThesisReviewService>();
 
+        // Student Coursework
+services.AddScoped<IStudentCourseworkService, StudentCourseworkService>();
+
         // Literature Review
         services.AddScoped<ILiteratureReviewService, LiteratureReviewService>();
 

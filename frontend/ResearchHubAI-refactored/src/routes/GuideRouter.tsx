@@ -12,6 +12,7 @@ import GuideThesisReviews from "../pages/guide/GuideThesisReviews";
 import NotificationsScreen from "../pages/shared/NotificationsScreen";
 import SettingsShared from "../pages/shared/SettingsShared";
 import { GUIDE_NAV } from "../utils/navigation";
+import GuideCourseworkReview from "../pages/guide/GuideCourseworkReview";
 
 export default function GuideRouter() {
   const { screen } = useApp();
@@ -29,6 +30,8 @@ export default function GuideRouter() {
     case "reports": return <GuideReports/>;
     case "profile": return <GuideProfile/>;
     case "settings": return <SettingsShared role="guide"/>;
+    case "coursework-review":
+  return <GuideCourseworkReview />;
     default: return <AccessDenied page={screen}/>;
   }
 }
