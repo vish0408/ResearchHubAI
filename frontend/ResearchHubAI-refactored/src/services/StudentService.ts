@@ -1,5 +1,14 @@
 import { apiClient } from "../api/client";
-import { StudentProfileDto, Project, TaskItem, Milestone, ProjectDocument, AppNotification, DashboardData } from "../types/Student";
+import {
+  StudentProfileDto,
+  Project,
+  TaskItem,
+  Milestone,
+  ProjectDocument,
+  AppNotification,
+  DashboardData,
+  StudentCoursework
+} from "../types/Student";
 import type {
   Chapter,
   ChapterVersion,
@@ -8,6 +17,137 @@ import type {
 import type { PagedResponse } from "../types/Pagination";
 
 export class StudentService {
+
+// Student Coursework
+
+async getMyCoursework(): Promise<StudentCoursework[]> {
+  const res = await apiClient.get<StudentCoursework[]>(
+    "/student-coursework"
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to get student coursework"
+    );
+  }
+
+  return res.data;
+}
+
+async createStudentCoursework(data: {
+  courseName: string;
+  courseCode?: string;
+  courseType: string;
+  credits: number;
+  institution?: string;
+  description?: string;
+  startDate?: string;
+  completionDate: string;
+  certificate: File;
+}): Promise<StudentCoursework> {
+  const formData = new FormData();
+
+  formData.append("CourseName", data.courseName);
+  formData.append("CourseCode", data.courseCode || "");
+  formData.append("CourseType", data.courseType);
+  formData.append("Credits", data.credits.toString());
+  formData.append("Institution", data.institution || "");
+  formData.append("Description", data.description || "");
+
+  if (data.startDate) {
+    formData.append("StartDate", data.startDate);
+  }
+
+  formData.append("CompletionDate", data.completionDate);
+  formData.append("Certificate", data.certificate);
+
+  const res = await apiClient.upload<StudentCoursework>(
+    "/student-coursework",
+    formData
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to submit coursework"
+    );
+  }
+
+  return res.data;
+}
+
+async updateStudentCoursework(
+  courseworkId: string,
+  data: {
+    courseName: string;
+    courseCode?: string;
+    courseType: string;
+    credits: number;
+    institution?: string;
+    description?: string;
+    startDate?: string;
+    completionDate: string;
+    certificate?: File;
+  }
+): Promise<StudentCoursework> {
+  const formData = new FormData();
+
+  formData.append("CourseName", data.courseName);
+  formData.append("CourseCode", data.courseCode || "");
+  formData.append("CourseType", data.courseType);
+  formData.append("Credits", data.credits.toString());
+  formData.append("Institution", data.institution || "");
+  formData.append("Description", data.description || "");
+
+  if (data.startDate) {
+    formData.append("StartDate", data.startDate);
+  }
+
+  formData.append("CompletionDate", data.completionDate);
+
+  if (data.certificate) {
+    formData.append("Certificate", data.certificate);
+  }
+
+  const res = await apiClient.uploadPut<StudentCoursework>(
+    `/student-coursework/${courseworkId}`,
+    formData
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to resubmit coursework"
+    );
+  }
+
+  return res.data;
+}
+
+async deleteStudentCoursework(
+  courseworkId: string
+): Promise<void> {
+  const res = await apiClient.delete(
+    `/student-coursework/${courseworkId}`
+  );
+
+  if (!res.success) {
+    throw new Error(
+      res.message || "Failed to delete coursework"
+    );
+  }
+}
+
+async downloadStudentCourseworkCertificate(
+  courseworkId: string
+): Promise<{
+  data: Blob;
+  fileName: string;
+  contentType: string;
+}> {
+  return apiClient.downloadBlob(
+    `/student-coursework/${courseworkId}/certificate`
+  );
+}
+
   // Profile
   async getProfile(): Promise<StudentProfileDto> {
   const res = await apiClient.get<StudentProfileDto>("/student/profile");
@@ -69,6 +209,11 @@ async markChapterFeedbackThreadAsRead(
     );
   }
 }
+
+
+
+
+
 
   // Dashboard
   async getDashboard(): Promise<DashboardData> {
@@ -355,6 +500,10 @@ async getMyMeetings(): Promise<Meeting[]> {
 
   return res.data;
 }
+
+
+
+  
 
   // Notifications
   async getNotifications(): Promise<AppNotification[]> {

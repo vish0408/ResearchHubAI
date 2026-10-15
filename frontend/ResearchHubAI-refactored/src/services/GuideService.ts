@@ -13,6 +13,7 @@ import {
 } from "../types/Guide";
 import type { AppNotification } from "../types/Student";
 import type { PagedResponse } from "../types/Pagination";
+import type { StudentCoursework } from "../types/Student";
 
 
 export class GuideService {
@@ -27,6 +28,60 @@ export class GuideService {
     if (!res.success || !res.data) throw new Error(res.message || "Failed to update profile");
     return res.data;
   }
+
+  
+  // Student Coursework Review
+  async getPendingCoursework(): Promise<StudentCoursework[]> {
+    const res = await apiClient.get<StudentCoursework[]>(
+      "/student-coursework/guide/pending"
+    );
+
+    if (!res.success || !res.data) {
+      throw new Error(
+        res.message || "Failed to load pending coursework"
+      );
+    }
+
+    return res.data;
+  }
+
+  async getAllCoursework(): Promise<StudentCoursework[]> {
+  const res = await apiClient.get<StudentCoursework[]>(
+    "/student-coursework/guide/all"
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to load coursework submissions"
+    );
+  }
+
+  return res.data;
+}
+
+async reviewCoursework(
+  courseworkId: string,
+  data: {
+    status: "Approved" | "Rejected";
+    feedback?: string;
+  }
+): Promise<StudentCoursework> {
+  const res = await apiClient.patch<StudentCoursework>(
+    `/student-coursework/${courseworkId}/review`,
+    {
+      status: data.status,
+      feedback: data.feedback,
+    }
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || "Failed to review coursework"
+    );
+  }
+
+  return res.data;
+}
 
   // Dashboard
   async getDashboard(): Promise<GuideDashboardData> {
@@ -243,6 +298,18 @@ async downloadChapterVersion(
     `/projects/${projectId}/chapters/${chapterId}/versions/${versionId}/download`
   );
 }
+
+
+  async downloadCourseworkCertificate(courseworkId: string) {
+    return await apiClient.downloadBlob(
+      `/student-coursework/guide/${courseworkId}/certificate`
+    );
+  }
+
+  async getCourseworkCertificateUrl(courseworkId: string): Promise<string> {
+    const result = await this.downloadCourseworkCertificate(courseworkId);
+    return URL.createObjectURL(result.data);
+  }
 
 
 }

@@ -11,7 +11,7 @@ import StudentGuideComments from "../pages/student/StudentGuideComments";
 import LiteratureReviewPage from "../pages/student/LiteratureReviewPage";
 import ProposalGenerator from "../pages/student/ProposalGenerator";
 import StudentMeetings from "../pages/student/StudentMeetings";
-import StudentMyResearch from "../pages/student/StudentMyResearch";
+import StudentCoursework from "../pages/student/StudentCoursework";
 import StudentProfile from "../pages/student/StudentProfile";
 import StudentProfileEdit from "../pages/student/StudentProfileEdit";
 import StudentProgressTracker from "../pages/student/StudentProgressTracker";
@@ -36,8 +36,8 @@ export default function StudentRouter() {
     case "dashboard":
       return <StudentDashboard />;
 
-    case "my-research":
-      return <StudentMyResearch />;
+   case "student-coursework":
+  return <StudentCoursework />;
 
     case "research-timeline":
       return <StudentResearchTimeline />;

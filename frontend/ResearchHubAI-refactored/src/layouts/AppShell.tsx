@@ -70,11 +70,17 @@ export default function AppShell({ user }: { user: CurrentUser }) {
           studentService.getUnreadCount(),
         ]);
 
-        setStudentCounts({
-          meetings: meetings.length,
-          guideComments: 0,
-          notifications,
-        });
+       
+setStudentCounts({
+  meetings: meetings.filter(
+    (meeting) =>
+      meeting.status === "Pending" ||
+      meeting.status === "Requested"
+  ).length,
+  guideComments: 0,
+  notifications,
+});
+
       } catch (error) {
         console.error("Failed to load student sidebar counts:", error);
       }
